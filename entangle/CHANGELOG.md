@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.3
+
+- Replace the default Areas flowchart with compact device containers holding their visible entities.
+- Remove ownership lines in Areas and show other connections on selection, with an option to show all references.
+- Repack filtered entities before layout to eliminate automatic gaps and replace old Areas coordinates automatically.
+- Keep direction controls in Relationships and route reverse ownership edges from the correct handles.
+- Preserve explicit area overrides, nested group dragging, and all source relationships in the Inspector.
+
 ## 0.3.2
 
 - Organize the Areas view into device families, with entities beside or below their device in both layout directions.

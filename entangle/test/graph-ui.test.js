@@ -34,6 +34,9 @@ test('layout is deterministic, hierarchical in both directions and preserves rel
     const parent = result.nodes.find(n => n.id === 'area'), child = result.nodes.find(n => n.id === 'light.desk');
     assert.ok(direction === 'LR' ? parent.position.x < child.position.x : parent.position.y < child.position.y);
     assert.equal(result.edges[0].source, 'light.desk');
+    assert.equal(result.edges[0].target,'area');
+    assert.equal(result.edges[0].sourceHandle,'reverse-source');
+    assert.equal(result.edges[0].targetHandle,'reverse-target');
   }
 });
 test('saved positions survive reload and navigation, and expansion preserves every existing position', () => {

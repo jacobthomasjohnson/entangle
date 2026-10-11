@@ -21,4 +21,6 @@ main[hidden]{display:none}
 .react-flow__node-area{z-index:-1}.react-flow__node-area .react-flow__handle{z-index:1}
 
 .brand-logo{width:26px;height:36px;object-fit:contain;flex-shrink:0}
+.area-chart .react-flow__handle{opacity:0}.area-chart .react-flow__node:hover .react-flow__handle,.area-chart .react-flow__node.selected .react-flow__handle{opacity:1}
 .entity-type-filter>p{margin:8px 0;line-height:1.5}.entity-type-filter>button{margin-top:8px;font-size:calc(11px * var(--font-scale,1))}
+.device-container{width:100%;height:100%;border:1px solid var(--color-98a6b9,#98a6b9);border-radius:calc(10px * var(--radius-scale,1));background:color-mix(in srgb,var(--color-98a6b9,#98a6b9) 5%,var(--color-12151a,#12151a))}.device-container.selected{outline:2px solid var(--color-a5a0f0,#a5a0f0);outline-offset:2px}.device-heading{height:52px;display:flex;align-items:center;gap:10px;padding:12px 24px;cursor:grab;border-bottom:1px solid var(--color-292e38,#292e38)}.device-heading strong{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.device-heading small{white-space:nowrap}.device-empty{padding:12px 24px;color:var(--color-949ba8,#949ba8);font-size:11px}.connection-toggle{display:flex;align-items:center;gap:6px;font-size:11px}.connection-toggle input{accent-color:var(--color-a5a0f0,#a5a0f0)}.react-flow__node-deviceGroup{z-index:0}

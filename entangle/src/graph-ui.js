@@ -45,7 +45,8 @@ export function layout(graph, direction = 'LR', retained = new Map(), saved = {}
   }
   return { nodes: placed, edges: graph.edges.map(e => {
     const siblings = pairs.get(JSON.stringify([e.source, e.target])).slice().sort();
-    return { ...e, type: 'relationship', data: { direction, bend: (siblings.indexOf(e.id) - (siblings.length - 1) / 2) * 32 }, label: e.relationship, style: relationshipStyle(e.relationship) };
+    const reverse = ['owned by', 'inherited area', 'assigned area'].includes(e.relationship);
+    return { ...e, sourceHandle: reverse ? 'reverse-source' : 'out', targetHandle: reverse ? 'reverse-target' : 'in', type: 'relationship', data: { direction, bend: (siblings.indexOf(e.id) - (siblings.length - 1) / 2) * 32 }, label: e.relationship, style: relationshipStyle(e.relationship) };
   }), truncated: graph.truncated };
 }
 export const domainOf = n => n.kind !== 'entity' ? n.kind : (n.entityId || n.id || '').split('.')[0];

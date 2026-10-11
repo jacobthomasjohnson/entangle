@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { ReactFlow, Background, Controls, Handle, Position, BaseEdge, EdgeLabelRenderer, ReactFlowProvider, useReactFlow, applyNodeChanges } from '@xyflow/react';
+import { ReactFlow, Background, Controls, Handle, Position, BaseEdge, EdgeLabelRenderer, ReactFlowProvider, useReactFlow, applyNodeChanges, getBezierPath } from '@xyflow/react';
 import { layout, readPreference, writePreference, positionKey, domainOf, filterNodes, DIAGNOSTIC_FILTER_KEY, loadHideDiagnostic, isDiagnostic, filterDiagnosticGraph, diagnosticSelection, HIDDEN_TYPES_KEY, loadHiddenTypes, entityTypeOptions, isHiddenEntityType, filterEntityTypes } from './graph-ui.js';
 import { appearance, NodeIcon } from './appearance.jsx';
 import { selectSubgraph, selectAreaGraph } from '../server/graph.js';
@@ -9,7 +9,7 @@ import '@xyflow/react/dist/style.css';
 import './style.css';
 import entangleLogo from './assets/entangle-logo.svg';
 import { AppearanceSettings } from './settings.jsx';
-import { areaLayout, VIEW_KEY, views, viewPositionKey } from './area-view.js';
+import { areaLayout, areaEdges, VIEW_KEY, views, viewPositionKey } from './area-view.js';
 import { THEME_KEY, sanitizeTheme, themeStyle } from './theme.js';
 
 async function api(endpoint, options) {
@@ -19,34 +19,45 @@ async function api(endpoint, options) {
   return result;
 }
 function storage() { try { return window.localStorage; } catch { return undefined; } }
+function GraphHandles({ direction }) {
+  const vertical = direction === 'TB';
+  return <>
+    <Handle id="in" type="target" position={vertical ? Position.Top : Position.Left}/>
+    <Handle id="out" type="source" position={vertical ? Position.Bottom : Position.Right}/>
+    <Handle id="reverse-source" isConnectable={false} style={{pointerEvents:'none'}} type="source" position={vertical ? Position.Top : Position.Left}/>
+    <Handle id="reverse-target" isConnectable={false} style={{pointerEvents:'none'}} type="target" position={vertical ? Position.Bottom : Position.Right}/>
+  </>;
+}
 function Node({ data, selected }) {
-  const visual = appearance(data), vertical = data.direction === 'TB';
+  const visual = appearance(data);
   return <div className={`graph-node ${selected ? 'selected' : ''}`} style={{ '--node-color': visual.color }}>
-    <Handle type="target" position={vertical ? Position.Top : Position.Left}/>
+    <GraphHandles direction={data.direction}/>
     <div className="node-heading"><NodeIcon node={data}/><strong title={data.label}>{data.label}</strong></div>
     <div className="node-kind">{visual.label}</div>
     {data.state != null && <small title={`${data.state} ${data.unit || ''}`}>{data.state} {data.unit || ''}</small>}
-    <Handle type="source" position={vertical ? Position.Bottom : Position.Right}/>
+
   </div>;
 }
 function AreaNode({data,selected}) {
- const vertical=data.direction==='TB';
  return <div className={`area-container ${selected ? 'selected' : ''}`}>
-  <Handle type="target" position={vertical ? Position.Top : Position.Left}/>
+  <GraphHandles direction={data.direction}/>
   <div className="area-heading"><NodeIcon node={data}/><strong>{data.label}</strong><small>{data.memberCount} members shown</small></div>
-  <Handle type="source" position={vertical ? Position.Bottom : Position.Right}/>
+
  </div>;
 }
-const nodeTypes = { relationship: Node, area: AreaNode };
-function RelationshipEdge({ id, source, target, sourceX, sourceY, targetX, targetY, data, label, style, selected }) {
+function DeviceGroup({ data, selected }) {
+  return <div className={`device-container ${selected ? 'selected' : ''}`}>
+    <GraphHandles direction="LR"/>
+    <div className="device-heading"><NodeIcon node={data}/><strong title={data.label}>{data.label}</strong><small>{data.memberCount} entities</small></div>
+    {!data.memberCount && <p className="device-empty">No visible entities in this group</p>}
+  </div>;
+}
+const nodeTypes = { relationship: Node, area: AreaNode, deviceGroup: DeviceGroup };
+function RelationshipEdge({ id, source, target, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data, label, style, selected }) {
   const [hovered, setHovered] = useState(false);
-  const bend = data?.bend || 0, vertical = data?.direction === 'TB';
-  const distance = Math.max(65, Math.abs(vertical ? targetY - sourceY : targetX - sourceX) * 0.45);
-  const path = vertical
-    ? `M ${sourceX},${sourceY} C ${sourceX + bend},${sourceY + distance} ${targetX + bend},${targetY - distance} ${targetX},${targetY}`
-    : `M ${sourceX},${sourceY} C ${sourceX + distance},${sourceY + bend} ${targetX - distance},${targetY + bend} ${targetX},${targetY}`;
+  const [path, labelX, labelY] = getBezierPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, curvature: Math.max(.08, .25 + (data?.bend || 0) / 160) });
   return <><g onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}><title>{`${source} ? ${target}: ${label}`}</title><BaseEdge id={id} path={path} style={style}/></g>
-    {(selected || hovered) && <EdgeLabelRenderer><div className="relationship-label nodrag nopan selected" style={{ transform: `translate(-50%, -50%) translate(${(sourceX + targetX) / 2 + (vertical ? bend * .75 : 0)}px,${(sourceY + targetY) / 2 + (vertical ? 0 : bend * .75)}px)` }} title={`${source} ? ${target}: ${label}`}>{label}</div></EdgeLabelRenderer>}</>;
+    {(selected || hovered) && <EdgeLabelRenderer><div className="relationship-label nodrag nopan selected" style={{ transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)` }} title={`${source} ? ${target}: ${label}`}>{label}</div></EdgeLabelRenderer>}</>;
 }
 const edgeTypes = { relationship: RelationshipEdge };
 
@@ -99,6 +110,7 @@ function App() {
   const [domains, setDomains] = useState(() => { const value = readPreference(storage(), 'entangle.filters.v1', []); return Array.isArray(value) ? value.filter(d => typeof d === 'string') : []; });
   const [hideDiagnostic, setHideDiagnostic] = useState(() => loadHideDiagnostic(storage()));
   const [hiddenTypes, setHiddenTypes] = useState(() => loadHiddenTypes(storage()));
+  const [showAreaConnections, setShowAreaConnections] = useState(false);
   const [layoutRevision, setLayoutRevision] = useState(0);
   const [query, setQuery] = useState(''), [focus, setFocus] = useState(''), [depth, setDepth] = useState(1);
   const [inspectedId, setInspectedId] = useState(''), [selectedEdge, setSelectedEdge] = useState(''), [creating, setCreating] = useState(false);
@@ -127,6 +139,7 @@ function App() {
     const nodes = sandbox.nodes.slice(0, 180), ids = new Set(nodes.map(n => n.id));
     return { nodes, edges: sandbox.edges.filter(e => ids.has(e.source) && ids.has(e.target)), truncated: sandbox.nodes.length > 180 };
   }, [sandbox, editable, view, focus, depth, liveGraph]);
+  const layoutGraph = useMemo(() => view === 'areas' ? filterEntityTypes(filterDiagnosticGraph(rawGraph, hideDiagnostic), hiddenTypes) : rawGraph, [rawGraph, view, hideDiagnostic, hiddenTypes]);
   useEffect(() => {
     const key = `${mode}|${view}|${focus}`, resetView = viewKey.current !== key;
     const directionChanged = layoutDirection.current !== direction; layoutDirection.current = direction;
@@ -135,14 +148,14 @@ function App() {
     setGraph(previous => {
       const retained = resetView || directionChanged ? new Map() : new Map(previous.nodes.map(n => [n.id,n]));
       const saved = stored && typeof stored === 'object' ? stored : {};
-      return view === 'areas' ? areaLayout(rawGraph,direction,retained,saved) : layout(rawGraph,direction,retained,saved,focus);
+      return view === 'areas' ? areaLayout(layoutGraph,'LR',retained,saved) : layout(rawGraph,direction,retained,saved,focus);
     });
-    if (resetView || directionChanged) fitPending.current = true;
+    if (resetView || directionChanged || view === 'areas') fitPending.current = true;
     if (rawGraph.nodes.length && fitPending.current) {
       fitPending.current = false;
       clearTimeout(fitTimer.current); fitTimer.current = setTimeout(() => flow.fitView({ padding: 0.22, duration: 150 }), 50);
     }
-  }, [rawGraph, mode, view, focus, direction, layoutRevision]);
+  }, [rawGraph, layoutGraph, mode, view, focus, direction, layoutRevision]);
   useEffect(() => () => clearTimeout(fitTimer.current), []);
   const searchable = editable ? sandbox.nodes : snapshot?.entities || [];
   const availableDomains = useMemo(() => [...new Set(searchable.map(domainOf))].sort(), [searchable]);
@@ -213,7 +226,7 @@ function App() {
     const saved = readPreference(storage(), positionsKey, {}), nextSaved = { ...saved };
     rawGraph.nodes.forEach(n => delete nextSaved[n.id]);
     setNotice(writePreference(storage(), positionsKey, nextSaved));
-    const clean = { ...rawGraph, nodes: rawGraph.nodes.map(({ position, ...n }) => n) };
+    const clean = { ...layoutGraph, nodes: layoutGraph.nodes.map(({ position, ...n }) => n) };
     const next = view === 'areas' ? areaLayout(clean,direction) : layout(clean,direction);
     if (editable && view === 'relationships') {
       const ids = new Set(rawGraph.nodes.map(n => n.id));
@@ -232,11 +245,12 @@ function App() {
   const error = actionError || (editable ? '' : liveError || snapshot?.error);
   const connected = new Set(selection.nodeId ? [selection.nodeId] : []);
   if (selection.nodeId) visibleConnections.forEach(e => { if (e.source === selection.nodeId || e.target === selection.nodeId) { connected.add(e.source); connected.add(e.target); } });
-  for (const node of visibleGraph.nodes) if (node.parentId === selection.nodeId) connected.add(node.id);
+  for (const node of visibleGraph.nodes) if (connected.has(node.parentId)) connected.add(node.id);
   const selectedRelationship = visibleGraph.edges.find(e => e.id === selection.edgeId);
   if (selectedRelationship) { connected.add(selectedRelationship.source); connected.add(selectedRelationship.target); }
-  const renderedNodes = visibleGraph.nodes.map(n => ({ ...n, selected: n.id === selection.nodeId || (!selection.nodeId && n.id === focus), data: n.type === 'area' ? {...n.data, memberCount:visibleGraph.nodes.filter(child=>child.parentId===n.id).length} : n.data, style: { ...n.style, opacity: n.type === 'area' ? 1 : connected.size && !connected.has(n.id) ? .5 : 1 } }));
-  const renderedEdges = visibleGraph.edges.map(e => {
+  const renderedNodes = visibleGraph.nodes.map(n => ({ ...n, selected: n.id === selection.nodeId || (!selection.nodeId && n.id === focus), data: n.data, style: { ...n.style, opacity: ['area','deviceGroup'].includes(n.type) ? 1 : connected.size && !connected.has(n.id) ? .5 : 1 } }));
+  const chartEdges = view === 'areas' ? areaEdges(visibleGraph, selection.nodeId, selection.edgeId, showAreaConnections) : visibleGraph.edges;
+  const renderedEdges = chartEdges.map(e => {
     const highlighted = e.id === selection.edgeId || (selection.nodeId && (e.source === selection.nodeId || e.target === selection.nodeId));
     return { ...e, selected: e.id === selection.edgeId, style: { ...e.style, opacity: connected.size && !highlighted ? .3 : 1, strokeWidth: highlighted ? 2.5 : 1.5 } };
   });
@@ -257,13 +271,13 @@ function App() {
             {focus && <><button onClick={() => setDepth(depth === 1 ? 2 : 1)}>{depth === 1 ? 'Expand one level' : 'Immediate only'}</button><button onClick={() => { setDepth(1); setInspectedId(focus); setSelectedEdge(''); flow.fitView({ padding: 0.22 }); }}>Reset focus</button></>}
             {focus && <button onClick={() => { setFocus(''); setDepth(1); }}>Show all</button>}
             <select aria-label="View type" value={view} onChange={e => {setView(e.target.value);setSelectedEdge('');setNotice(writePreference(storage(),VIEW_KEY,e.target.value));}}>{views.map(v=><option key={v.id} value={v.id}>{v.label}</option>)}</select>
-            <select aria-label="Layout direction" value={direction} onChange={e => { setDirection(e.target.value); writePreference(storage(), 'entangle.direction.v1', e.target.value); }}><option value="LR">Left to right</option><option value="TB">Top to bottom</option></select><button onClick={autoLayout}>Reset Layout</button><button onClick={() => flow.fitView({ padding: 0.22 })}>Fit view</button>
+            {view === 'relationships' && <select aria-label="Layout direction" value={direction} onChange={e => { setDirection(e.target.value); writePreference(storage(), 'entangle.direction.v1', e.target.value); }}><option value="LR">Left to right</option><option value="TB">Top to bottom</option></select>}{view === 'areas' && <label className="connection-toggle"><input type="checkbox" checked={showAreaConnections} onChange={e => setShowAreaConnections(e.target.checked)}/>Show all connections</label>}<button onClick={autoLayout}>Reset Layout</button><button onClick={() => flow.fitView({ padding: 0.22 })}>Fit view</button>
             {editable && <details className="sandbox-menu"><summary>Sandbox tools</summary><div><button onClick={() => replace(starterSandbox())}>Reset Sandbox</button><button onClick={() => replace(emptySandbox())}>Clear / start empty</button><button onClick={() => fileInput.current?.click()}>Import JSON</button><button onClick={exportFile}>Export JSON</button></div></details>}
           </div>}
         </div>
         <input ref={fileInput} type="file" accept="application/json,.json" hidden onChange={importFile}/>
         {error && <div role="alert" className="error">{error}</div>}{notice && <div className="storage-notice" role="status">{notice}</div>}
-        <div className="flow-container">{editable || ((focus || view === 'areas') && snapshot?.connected) ? <>
+        <div className={`flow-container ${view === 'areas' ? 'area-chart' : ''}`}>{editable || ((focus || view === 'areas') && snapshot?.connected) ? <>
           <ReactFlow nodes={renderedNodes} edges={renderedEdges} nodeTypes={nodeTypes} edgeTypes={edgeTypes}
             onNodeClick={(_, n) => { setInspectedId(n.id); setSelectedEdge(''); setCreating(false); }} onEdgeClick={(_, e) => { setSelectedEdge(e.id); setInspectedId(''); setCreating(false); }} onPaneClick={() => { setInspectedId(''); setSelectedEdge(''); setCreating(false); }}
             onNodesChange={changes => setGraph(g => ({ ...g, nodes: applyNodeChanges(changes.filter(c => c.type === 'position' || c.type === 'dimensions'), g.nodes) }))}
@@ -274,7 +288,7 @@ function App() {
           {editable && !sandbox.nodes.length && <div className="empty sandbox-empty"><span>⋈</span><h1>Build your sandbox</h1><p>Add a node or restore the starter graph from Sandbox tools.</p><button onClick={createNode}>+ Add Node</button></div>}
         </> : <div className="empty"><span>⋈</span><h1>{busy ? 'Connecting to Home Assistant' : 'Start with an entity'}</h1><p>{busy ? 'Loading states and registries…' : 'Search and select an entity to explore its connections.'}</p></div>}{graphBusy && <div className="loading" role="status">Loading relationships…</div>}</div>
         <div className="coverage">{graph.truncated && <p>View limited to 180 nodes. Search for an area or entity to explore further.</p>}
-          {view === 'areas' && <p>Areas keep each device beside its entities, with separate rows for each device family. Drag an area by its heading to move its members together. Unassigned nodes remain outside. Area membership is shown by containment; other relationships remain visible.</p>}
+          {view === 'areas' && <p>Devices contain their visible entities. Select a device, entity, or area to see its connections, or enable Show all connections. Drag an area or device heading to move its group. Use Relationships view to edit ownership connections in Sandbox.</p>}
           {editable ? <span>Sandbox · virtual data only. Drag from a right handle to a left handle to connect. Select a node or edge to edit. No automations execute.</span> : <details><summary>Coverage · graph is not exhaustive{snapshot ? ` · ${snapshot.analyzed} YAML configurations analyzed` : ''}</summary>{snapshot?.warnings.map((w, i) => <p key={i}>{w}</p>)}<p>Ownership and area assignments come from registries. Edges describe references, not guaranteed runtime execution. State is current as of the last refresh.</p></details>}
         </div>
       </section>
