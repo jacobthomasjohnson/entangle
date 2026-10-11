@@ -55,6 +55,10 @@ export function validateSandbox(value) {
       if (result !== undefined) node[key] = result;
     }
     if (n.kind === 'entity') {
+      if (n.entity_category !== undefined && n.entity_category !== null && n.entity_category !== '') {
+        if (!['diagnostic', 'config'].includes(n.entity_category)) throw new Error('entity_category must be diagnostic, config, or uncategorized.');
+        node.entity_category = n.entity_category;
+      }
       const entityId = string(n.entityId, 'entity_id', true, 200);
       if (!/^[a-z_]+\.[a-z0-9_]+$/.test(entityId)) throw new Error('entity_id must look like light.studio_lamp.');
       if (entityIds.has(entityId)) throw new Error(`Duplicate entity_id: ${entityId}`); entityIds.add(entityId);

@@ -10,7 +10,7 @@ export function buildGraph(data, configuration) {
     const r = registry.get(entityId), s = states.get(entityId);
     const device = nodes.get(`device:${r?.device_id}`);
     const domain = entityId.split('.')[0];
-    add({ id: entityId, entityId, kind: ['automation', 'script'].includes(domain) ? domain : 'entity', label: s?.attributes?.friendly_name || r?.name || r?.original_name || entityId, state: s?.state ?? null, lastChanged: s?.last_changed, unit: s?.attributes?.unit_of_measurement, deviceId: r?.device_id, areaId: r?.area_id || device?.areaId, disabled: !!r?.disabled_by });
+    add({ id: entityId, entityId, kind: ['automation', 'script'].includes(domain) ? domain : 'entity', label: s?.attributes?.friendly_name || r?.name || r?.original_name || entityId, state: s?.state ?? null, entity_category: r?.entity_category, lastChanged: s?.last_changed, deviceClass: s?.attributes?.device_class || r?.device_class || r?.original_device_class, unit: s?.attributes?.unit_of_measurement, deviceId: r?.device_id, areaId: r?.area_id || device?.areaId, disabled: !!r?.disabled_by });
   }
   const edge = (source, target, relationship) => {
     if (!nodes.has(source) || !nodes.has(target) || source === target) return;
