@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.1
+
+- Add Settings ? Appearance with browser-saved colors, font size, corner roundness, and spacing controls.
+- Add area containers and a Live overview, with selectable Areas and Relationships views and both layout directions.
+- Preserve explicit area assignments, inherited device membership, cross-area references, and separate saved view positions.
+- Add Entangle store icons, app header branding, and a favicon from the supplied SVG.
+- Include an optional Home Assistant custom icon module and sidebar setup instructions.
+
 ## 0.3.0
 
 - Package the complete application in a Supervisor-recognized App directory with custom repository metadata.
