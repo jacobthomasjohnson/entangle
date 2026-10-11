@@ -23,15 +23,15 @@ npm test
 npm start
 ```
 
-Open http://127.0.0.1:8099. Sandbox works without Home Assistant credentials. For local Live Mode, copy `.env.example` to `.env`, set `HA_URL` and `HA_TOKEN`, and restart. Optional `HA_CONFIG_DIR` points at the directory containing `configuration.yaml`. Run `npm run server` and `npm run dev` in separate terminals for Vite development.
+Open http://127.0.0.1:8099. Live opens by default and connects automatically. Select Sandbox for an isolated practice workspace without Home Assistant credentials. For local Live Mode, copy `.env.example` to `.env`, set `HA_URL` and `HA_TOKEN`, and restart. Optional `HA_CONFIG_DIR` points at the directory containing `configuration.yaml`. Run `npm run server` and `npm run dev` in separate terminals for Vite development.
 
 From the repository root, build the exact Supervisor context with:
 
 ```powershell
-docker build --platform linux/amd64 --build-arg BUILD_ARCH=amd64 --build-arg BUILD_VERSION=0.3.4 -t entangle:local ./entangle
+docker build --platform linux/amd64 --build-arg BUILD_ARCH=amd64 --build-arg BUILD_VERSION=0.3.5 -t entangle:local ./entangle
 ```
 
-The container startup command directly runs `node server/index.js` as its only service. No `run.sh`, init system or legacy `build.yaml` is required. Both Docker stages use an explicit `node:24-alpine` base. The App manifest, package and image labels all use version 0.3.4.
+The container startup command directly runs `node server/index.js` as its only service. No `run.sh`, init system or legacy `build.yaml` is required. Both Docker stages use an explicit `node:24-alpine` base. The App manifest, package and image labels all use version 0.3.5.
 
 ## Repository structure
 

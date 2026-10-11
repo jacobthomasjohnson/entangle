@@ -12,11 +12,11 @@ npm run build
 npm start
 ```
 
-Open http://127.0.0.1:8099. Sandbox starts immediately without credentials. For Live mode, copy `.env.example` to `.env`, set `HA_URL` and `HA_TOKEN` (a Home Assistant long-lived access token), and restart the server. Optionally set `HA_CONFIG_DIR` to the directory containing your real `configuration.yaml`. Without it, registry relationships still work. For frontend development run `npm run server` and `npm run dev` in separate terminals; open the Vite URL. Production runs one server process.
+Open http://127.0.0.1:8099. Live opens by default and connects automatically. Sandbox remains available without credentials through the mode selector. For local Live mode, copy `.env.example` to `.env`, set `HA_URL` and `HA_TOKEN` (a Home Assistant long-lived access token), and restart the server. Optionally set `HA_CONFIG_DIR` to the directory containing your real `configuration.yaml`. Without it, registry relationships still work. For frontend development run `npm run server` and `npm run dev` in separate terminals; open the Vite URL. Production runs one server process.
 
 ## Sandbox
 
-Sandbox is always the initial mode and is clearly labeled as virtual data. It makes no API requests; Live mode connects only when selected. Failed Live connections never substitute sandbox data.
+Live is the default landing mode and loads a read-only snapshot automatically. Sandbox is available through the mode selector and is clearly labeled as virtual practice data. While Sandbox is selected, its edits and navigation make no Home Assistant API requests. Failed Live connections show an error rather than substituting sandbox data.
 
 - Use **Add Node** to create entities, devices, areas, automations or scripts. The shared inspector edits IDs, display names, descriptions and relevant properties. Entity nodes also have an editable `entity_id`, state and unit; devices have manufacturer/model fields. Use **Save changes** to apply edits.
 - Drag from a source node's right handle to a target's left handle. Only the supported type pairs are accepted; automation-to-entity connections offer trigger, condition or control choices. Different relationship types between the same pair are supported; exact duplicates, self-links and missing targets are rejected.

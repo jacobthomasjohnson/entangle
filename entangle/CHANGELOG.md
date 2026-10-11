@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.5
+
+- Open Live Mode by default and load the read-only Home Assistant snapshot automatically.
+- Keep Sandbox available as an explicitly selected practice workspace; connection errors remain in Live without substituting virtual data.
+
 ## 0.3.4
 
 - Open automations and scripts in a dedicated flow view with the automation first, alternative triggers, condition gates, and numbered actions in YAML order.

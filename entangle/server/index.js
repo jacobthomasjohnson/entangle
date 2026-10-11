@@ -64,6 +64,6 @@ export async function createApp({ read, config = () => loadConfiguration(process
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const app = await createApp();
   await app.listen({ port: Number(process.env.PORT || 8099), host: process.env.HOST || '127.0.0.1' });
-  app.log.info({ homeAssistant: process.env.SUPERVISOR_TOKEN ? 'supervisor' : process.env.HA_TOKEN ? 'local' : 'not configured', ingressOnly: !!process.env.SUPERVISOR_TOKEN || process.env.ENTANGLE_INGRESS_ONLY === 'true' }, 'Entangle ready. Select Live Mode to connect; Sandbox remains isolated.');
+  app.log.info({ homeAssistant: process.env.SUPERVISOR_TOKEN ? 'supervisor' : process.env.HA_TOKEN ? 'local' : 'not configured', ingressOnly: !!process.env.SUPERVISOR_TOKEN || process.env.ENTANGLE_INGRESS_ONLY === 'true' }, 'Entangle ready. Live Mode connects on app opening; Sandbox remains isolated.');
   for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, async () => { app.log.info('Shutting down Entangle'); await app.close(); process.exit(0); });
 }

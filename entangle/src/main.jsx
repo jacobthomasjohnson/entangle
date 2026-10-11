@@ -104,7 +104,7 @@ function App() {
 
   const initial = useRef(null); if (!initial.current) initial.current = loadSandbox(storage());
   const [sandbox, setSandbox] = useState(initial.current.data), [notice, setNotice] = useState(initial.current.warning);
-  const [mode, setMode] = useState('sandbox'); const editable = mode === 'sandbox';
+  const [mode, setMode] = useState('live'); const editable = mode === 'sandbox';
   const [snapshot, setSnapshot] = useState(null), [busy, setBusy] = useState(false), [liveError, setLiveError] = useState('');
   const [view, setView] = useState(() => readPreference(storage(), VIEW_KEY, 'areas') === 'relationships' ? 'relationships' : 'areas');
   const [direction, setDirection] = useState(() => readPreference(storage(), 'entangle.direction.v1', 'LR') === 'TB' ? 'TB' : 'LR');
