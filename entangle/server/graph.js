@@ -1,3 +1,4 @@
+import { normalizeFlow } from './automation-flow.js';
 const literals = value => (Array.isArray(value) ? value : typeof value === 'string' ? value.split(',').map(x => x.trim()) : []).filter(x => typeof x === 'string' && !/[{}%]/.test(x));
 export function buildGraph(data, configuration) {
   const nodes = new Map(), edges = new Map();
@@ -21,6 +22,8 @@ export function buildGraph(data, configuration) {
     if (node.areaId) edge(node.id, `area:${node.areaId}`, node.entityId && !registry.get(node.id)?.area_id ? 'inherited area' : 'assigned area');
   }
   let analyzed = 0;
+  const flows = Object.create(null), configurationIds = new Map();
+  for (const a of configuration.automations) if (a?.id != null) configurationIds.set(String(a.id), (configurationIds.get(String(a.id)) || 0) + 1);
   const automationIds = new Map();
   for (const s of states.values()) {
     if (!s.entity_id.startsWith('automation.') || s.attributes?.id == null) continue;
@@ -48,14 +51,16 @@ export function buildGraph(data, configuration) {
     const matches = automationIds.get(String(automation.id)) || [];
     if (matches.length !== 1) continue;
     const source = matches[0]; analyzed++;
+    if (configurationIds.get(String(automation.id)) === 1) flows[source] = normalizeFlow(automation);
     walk(automation.triggers || automation.trigger, source, 'trigger'); walk(automation.conditions || automation.condition, source, 'condition'); walk(automation.actions || automation.action, source, 'action');
   }
   for (const [key, script] of Object.entries(configuration.scripts)) {
     if (!nodes.has(`script.${key}`) || !script || typeof script !== 'object' || Array.isArray(script) || script.use_blueprint) continue;
+    flows[`script.${key}`] = normalizeFlow(script, 'script');
     analyzed++; walk(script.sequence, `script.${key}`, 'action');
   }
   const skipped = configuration.automations.length + Object.keys(configuration.scripts).length - analyzed;
-  return { nodes: [...nodes.values()], edges: [...edges.values()], warnings: [...data.warnings, ...configuration.warnings, ...(skipped ? [`${skipped} YAML configurations could not be uniquely mapped to a current automation/script entity or use a blueprint; their relationships are omitted.`] : [])], analyzed };
+  return { nodes: [...nodes.values()], edges: [...edges.values()], flows, warnings: [...data.warnings, ...configuration.warnings, ...(skipped ? [`${skipped} YAML configurations could not be uniquely mapped to a current automation/script entity or use a blueprint; their relationships are omitted.`] : [])], analyzed };
 }
 export function selectSubgraph(graph, focus, depth = 1, limit = 180) {
   const selected = new Set([focus]); let frontier = new Set([focus]); let truncated = false;

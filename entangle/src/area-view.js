@@ -1,7 +1,7 @@
 import { layout, NODE_WIDTH, NODE_HEIGHT, validPosition } from './graph-ui.js';
 import { areaMembership } from '../server/graph.js';
 export const VIEW_KEY = 'entangle.view.v1';
-export const views = [{ id: 'areas', label: 'Areas' }, { id: 'relationships', label: 'Relationships' }];
+export const views = [{ id: 'areas', label: 'Areas' }, { id: 'relationships', label: 'Relationships' }, { id: 'flow', label: 'Automation flow' }];
 // A new key prevents the old flowchart coordinates from overriding compact groups.
 export const viewPositionKey = (mode, view, direction) => view === 'areas' ? `entangle.positions.${mode}.areas.v2` : `entangle.positions.${mode}.v1`;
 const PAD = 24, HEADER = 64, GAP = 24;

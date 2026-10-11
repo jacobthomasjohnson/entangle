@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readHomeAssistant } from './ha.js';
 import { loadConfiguration } from './configuration.js';
+import { selectFlowGraph } from './automation-flow.js';
 import { buildGraph, selectSubgraph, selectAreaGraph } from './graph.js';
 
 export async function createApp({ read, config = () => loadConfiguration(process.env.HA_CONFIG_DIR || (process.env.SUPERVISOR_TOKEN ? '/homeassistant' : '')), ingressOnly = !!process.env.SUPERVISOR_TOKEN || process.env.ENTANGLE_INGRESS_ONLY === 'true', logger = true } = {}) {
@@ -38,6 +39,10 @@ export async function createApp({ read, config = () => loadConfiguration(process
     if (!graph) return reply.code(503).send({ error: error || 'Refresh the connection first.' });
     if (view === 'areas' && !focus) return selectAreaGraph(graph);
     if (!graph.nodes.some(n => n.id === focus)) return reply.code(404).send({ error: 'Entity not found.' });
+    if (view === 'flow') {
+      if (!['automation','script'].includes(graph.nodes.find(n => n.id === focus)?.kind)) return reply.code(400).send({ error: 'Choose an automation or script for Flow view.' });
+      return selectFlowGraph(graph, focus);
+    }
     return view === 'areas' ? selectAreaGraph(graph, focus, depth === '2' ? 2 : 1) : selectSubgraph(graph, focus, depth === '2' ? 2 : 1);
   });
   app.get('/api/health', async () => ({ status: 'ok' }));

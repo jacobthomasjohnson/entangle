@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.4
+
+- Open automations and scripts in a dedicated flow view with the automation first, alternative triggers, condition gates, and numbered actions in YAML order.
+- Preserve if/else, first-match choices, parallel branches, repeats, waits, delays, disabled steps, and stop behavior without inventing a linear order.
+- Expand direct script calls in place with recursion and nesting guards; show target area/device context beside the sequence.
+- Keep dynamic and unsupported steps visible, omit templates and arbitrary action data, and bound flow parsing and context sizes.
+- Show unordered reference groups when configuration is unavailable or ambiguous, including Sandbox and blueprint automations.
+
 ## 0.3.3
 
 - Replace the default Areas flowchart with compact device containers holding their visible entities.

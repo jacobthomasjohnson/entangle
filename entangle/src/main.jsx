@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { ReactFlow, Background, Controls, Handle, Position, BaseEdge, EdgeLabelRenderer, ReactFlowProvider, useReactFlow, applyNodeChanges, getBezierPath } from '@xyflow/react';
 import { layout, readPreference, writePreference, positionKey, domainOf, filterNodes, DIAGNOSTIC_FILTER_KEY, loadHideDiagnostic, isDiagnostic, filterDiagnosticGraph, diagnosticSelection, HIDDEN_TYPES_KEY, loadHiddenTypes, entityTypeOptions, isHiddenEntityType, filterEntityTypes } from './graph-ui.js';
 import { appearance, NodeIcon } from './appearance.jsx';
+import { AutomationFlow } from './automation-flow.jsx';
+import { selectFlowGraph } from '../server/automation-flow.js';
 import { selectSubgraph, selectAreaGraph } from '../server/graph.js';
 import { kinds, emptySandbox, starterSandbox, loadSandbox, saveSandbox, parseSandbox, serializeSandbox, updateNode, deleteNode, addRelationship, relationshipTypes } from './sandbox.js';
 import '@xyflow/react/dist/style.css';
@@ -125,7 +127,7 @@ function App() {
   useEffect(() => { if (mode === 'live') refresh(true); }, [mode]);
   useEffect(() => {
     const version = ++generation.current;
-    if (editable || (view === 'relationships' && !focus) || !snapshot?.connected) { setLiveGraph({ nodes: [], edges: [] }); setGraphBusy(false); return; }
+    if (editable || ((view === 'relationships' || view === 'flow') && !focus) || !snapshot?.connected) { setLiveGraph({ nodes: [], edges: [] }); setGraphBusy(false); return; }
     setGraphBusy(true); setLiveError('');
     api(`graph?view=${view}&focus=${encodeURIComponent(focus)}&depth=${depth}`).then(result => { if (version === generation.current) setLiveGraph(result); })
       .catch(e => { if (version === generation.current) { setLiveError(e.message); setLiveGraph({ nodes: [], edges: [] }); } })
@@ -135,6 +137,7 @@ function App() {
   const rawGraph = useMemo(() => {
     if (!editable) return liveGraph;
     if (view === 'areas') return selectAreaGraph(sandbox, focus, depth);
+    if (view === 'flow') return selectFlowGraph(sandbox, focus);
     if (focus) return selectSubgraph(sandbox, focus, depth);
     const nodes = sandbox.nodes.slice(0, 180), ids = new Set(nodes.map(n => n.id));
     return { nodes, edges: sandbox.edges.filter(e => ids.has(e.source) && ids.has(e.target)), truncated: sandbox.nodes.length > 180 };
@@ -144,6 +147,7 @@ function App() {
     const key = `${mode}|${view}|${focus}`, resetView = viewKey.current !== key;
     const directionChanged = layoutDirection.current !== direction; layoutDirection.current = direction;
     viewKey.current = key;
+    if (view === 'flow') { setGraph({ nodes: [], edges: [], truncated: rawGraph.truncated }); return; }
     const stored = readPreference(storage(), positionsKey, {});
     setGraph(previous => {
       const retained = resetView || directionChanged ? new Map() : new Map(previous.nodes.map(n => [n.id,n]));
@@ -191,7 +195,12 @@ function App() {
   }
   const inspected = (editable ? sandbox.nodes : liveGraph.nodes).find(n => n.id === selection.nodeId && (!hideDiagnostic || !isDiagnostic(n)));
   const inspectedEdge = visibleConnections.find(e => e.id === selection.edgeId);
-  const choose = id => { setFocus(id); setDepth(1); setInspectedId(id); setSelectedEdge(''); setCreating(false); setActionError(''); };
+  const choose = id => {
+    const node = searchable.find(n => n.id === id) || rawGraph.nodes.find(n => n.id === id);
+    const flowNode = ['automation','script'].includes(node?.kind);
+    if (flowNode) setView('flow'); else if (view === 'flow') setView('areas');
+    setFocus(id); setDepth(1); setInspectedId(flowNode && !editable ? '' : id); setSelectedEdge(''); setCreating(false); setActionError('');
+  };
   function switchMode(next) {
     setMode(next); setFocus(''); setDepth(1); setQuery(''); setInspectedId(''); setSelectedEdge(''); setCreating(false); setConnection(null); setActionError('');
   }
@@ -266,30 +275,30 @@ function App() {
         <footer>{editable ? 'Virtual data · saved in this browser' : 'Read only · refreshed on demand'}{!editable && snapshot?.refreshedAt && <small>Updated {new Date(snapshot.refreshedAt).toLocaleTimeString()}</small>}</footer>
       </aside>
       <section className="canvas">
-        <div className="graph-toolbar"><div><strong>{focus ? searchable.find(n => n.id === focus)?.label || focus : editable ? 'Sandbox workspace' : 'Explore your home'}</strong><small>{editable || focus || view === 'areas' ? `${visibleGraph.nodes.length} nodes · ${visibleGraph.edges.length} relationships` : 'Verified relationships, one entity at a time'}</small></div>
+        <div className="graph-toolbar"><div><strong>{focus ? searchable.find(n => n.id === focus)?.label || focus : editable ? 'Sandbox workspace' : 'Explore your home'}</strong><small>{view === 'flow' ? rawGraph.flow ? 'Configured sequence / not a live trace' : 'References only / order unavailable' : editable || focus || view === 'areas' ? `${visibleGraph.nodes.length} nodes · ${visibleGraph.edges.length} relationships` : 'Verified relationships, one entity at a time'}</small></div>
           {(editable || snapshot?.connected) && <div className="toolbar-buttons">
-            {focus && <><button onClick={() => setDepth(depth === 1 ? 2 : 1)}>{depth === 1 ? 'Expand one level' : 'Immediate only'}</button><button onClick={() => { setDepth(1); setInspectedId(focus); setSelectedEdge(''); flow.fitView({ padding: 0.22 }); }}>Reset focus</button></>}
-            {focus && <button onClick={() => { setFocus(''); setDepth(1); }}>Show all</button>}
-            <select aria-label="View type" value={view} onChange={e => {setView(e.target.value);setSelectedEdge('');setNotice(writePreference(storage(),VIEW_KEY,e.target.value));}}>{views.map(v=><option key={v.id} value={v.id}>{v.label}</option>)}</select>
-            {view === 'relationships' && <select aria-label="Layout direction" value={direction} onChange={e => { setDirection(e.target.value); writePreference(storage(), 'entangle.direction.v1', e.target.value); }}><option value="LR">Left to right</option><option value="TB">Top to bottom</option></select>}{view === 'areas' && <label className="connection-toggle"><input type="checkbox" checked={showAreaConnections} onChange={e => setShowAreaConnections(e.target.checked)}/>Show all connections</label>}<button onClick={autoLayout}>Reset Layout</button><button onClick={() => flow.fitView({ padding: 0.22 })}>Fit view</button>
+            {focus && view !== 'flow' && <><button onClick={() => setDepth(depth === 1 ? 2 : 1)}>{depth === 1 ? 'Expand one level' : 'Immediate only'}</button><button onClick={() => { setDepth(1); setInspectedId(focus); setSelectedEdge(''); flow.fitView({ padding: 0.22 }); }}>Reset focus</button></>}
+            {focus && <button onClick={() => { setFocus(''); setDepth(1); if (view === 'flow') setView('areas'); }}>Show all</button>}
+            <select aria-label="View type" value={view} onChange={e => { const next = e.target.value; setView(next); setSelectedEdge(''); if (next === 'flow' && !['automation','script'].includes(searchable.find(n => n.id === focus)?.kind)) { setFocus(''); setInspectedId(''); } setNotice(writePreference(storage(),VIEW_KEY,next)); }}>{views.map(v=><option key={v.id} value={v.id}>{v.label}</option>)}</select>
+            {view === 'relationships' && <select aria-label="Layout direction" value={direction} onChange={e => { setDirection(e.target.value); writePreference(storage(), 'entangle.direction.v1', e.target.value); }}><option value="LR">Left to right</option><option value="TB">Top to bottom</option></select>}{view === 'areas' && <label className="connection-toggle"><input type="checkbox" checked={showAreaConnections} onChange={e => setShowAreaConnections(e.target.checked)}/>Show all connections</label>}{view !== 'flow' && <><button onClick={autoLayout}>Reset Layout</button><button onClick={() => flow.fitView({ padding: 0.22 })}>Fit view</button></>}
             {editable && <details className="sandbox-menu"><summary>Sandbox tools</summary><div><button onClick={() => replace(starterSandbox())}>Reset Sandbox</button><button onClick={() => replace(emptySandbox())}>Clear / start empty</button><button onClick={() => fileInput.current?.click()}>Import JSON</button><button onClick={exportFile}>Export JSON</button></div></details>}
           </div>}
         </div>
         <input ref={fileInput} type="file" accept="application/json,.json" hidden onChange={importFile}/>
         {error && <div role="alert" className="error">{error}</div>}{notice && <div className="storage-notice" role="status">{notice}</div>}
-        <div className={`flow-container ${view === 'areas' ? 'area-chart' : ''}`}>{editable || ((focus || view === 'areas') && snapshot?.connected) ? <>
+        <div className={`flow-container ${view === 'areas' ? 'area-chart' : ''}`}>{view === 'flow' ? <AutomationFlow key={`${mode}:${focus}:${snapshot?.refreshedAt || ''}`} loading={graphBusy} graph={rawGraph} focus={focus} onExplore={choose} loadFlow={editable ? null : id => api(`graph?view=flow&focus=${encodeURIComponent(id)}`)} hideDiagnostic={hideDiagnostic} hiddenTypes={hiddenTypes}/> : editable || ((focus || view === 'areas') && snapshot?.connected) ? <>
           <ReactFlow nodes={renderedNodes} edges={renderedEdges} nodeTypes={nodeTypes} edgeTypes={edgeTypes}
-            onNodeClick={(_, n) => { setInspectedId(n.id); setSelectedEdge(''); setCreating(false); }} onEdgeClick={(_, e) => { setSelectedEdge(e.id); setInspectedId(''); setCreating(false); }} onPaneClick={() => { setInspectedId(''); setSelectedEdge(''); setCreating(false); }}
+            onNodeClick={(_, n) => { if (['automation','script'].includes(n.data.kind)) { choose(n.id); return; } setInspectedId(n.id); setSelectedEdge(''); setCreating(false); }} onEdgeClick={(_, e) => { setSelectedEdge(e.id); setInspectedId(''); setCreating(false); }} onPaneClick={() => { setInspectedId(''); setSelectedEdge(''); setCreating(false); }}
             onNodesChange={changes => setGraph(g => ({ ...g, nodes: applyNodeChanges(changes.filter(c => c.type === 'position' || c.type === 'dimensions'), g.nodes) }))}
             onNodeDragStop={(_, node) => persistPosition(node)}
             onConnect={connect} nodesConnectable={editable} nodesDraggable={true} edgesReconnectable={false} deleteKeyCode={null} colorMode="dark" minZoom={0.1} maxZoom={1.8} fitView>
             <Background color="var(--color-292e38, #292e38)" gap={24}/><Controls showInteractive={false}/>
           </ReactFlow>
           {editable && !sandbox.nodes.length && <div className="empty sandbox-empty"><span>⋈</span><h1>Build your sandbox</h1><p>Add a node or restore the starter graph from Sandbox tools.</p><button onClick={createNode}>+ Add Node</button></div>}
-        </> : <div className="empty"><span>⋈</span><h1>{busy ? 'Connecting to Home Assistant' : 'Start with an entity'}</h1><p>{busy ? 'Loading states and registries…' : 'Search and select an entity to explore its connections.'}</p></div>}{graphBusy && <div className="loading" role="status">Loading relationships…</div>}</div>
-        <div className="coverage">{graph.truncated && <p>View limited to 180 nodes. Search for an area or entity to explore further.</p>}
+        </> : <div className="empty"><span>⋈</span><h1>{busy ? 'Connecting to Home Assistant' : 'Start with an entity'}</h1><p>{busy ? 'Loading states and registries…' : 'Search and select an entity to explore its connections.'}</p></div>}{graphBusy && view !== 'flow' && <div className="loading" role="status">Loading relationships…</div>}</div>
+        <div className="coverage">{view !== 'flow' && graph.truncated && <p>View limited to 180 nodes. Search for an area or entity to explore further.</p>}
           {view === 'areas' && <p>Devices contain their visible entities. Select a device, entity, or area to see its connections, or enable Show all connections. Drag an area or device heading to move its group. Use Relationships view to edit ownership connections in Sandbox.</p>}
-          {editable ? <span>Sandbox · virtual data only. Drag from a right handle to a left handle to connect. Select a node or edge to edit. No automations execute.</span> : <details><summary>Coverage · graph is not exhaustive{snapshot ? ` · ${snapshot.analyzed} YAML configurations analyzed` : ''}</summary>{snapshot?.warnings.map((w, i) => <p key={i}>{w}</p>)}<p>Ownership and area assignments come from registries. Edges describe references, not guaranteed runtime execution. State is current as of the last refresh.</p></details>}
+          {view === 'flow' && <p>Flow shows configured order and branches. Hidden targets do not remove steps. Templates and service data are omitted; this view does not execute automations.</p>}{editable ? <span>Sandbox · virtual data only. Drag from a right handle to a left handle to connect. Select a node or edge to edit. No automations execute.</span> : <details><summary>Coverage · graph is not exhaustive{snapshot ? ` · ${snapshot.analyzed} YAML configurations analyzed` : ''}</summary>{snapshot?.warnings.map((w, i) => <p key={i}>{w}</p>)}<p>Ownership and area assignments come from registries. Edges describe references, not guaranteed runtime execution. State is current as of the last refresh.</p></details>}
         </div>
       </section>
       {(creating || inspected || inspectedEdge) && <aside className="inspector">

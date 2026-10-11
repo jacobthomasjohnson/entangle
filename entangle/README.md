@@ -73,13 +73,23 @@ Open **Settings ? Appearance** to customize the palette (including node and rela
 
 ### Area and relationship views
 
-The **View type** selector switches between **Areas** (the default) and **Relationships**. Areas uses compact groups; Relationships offers left-to-right and top-to-bottom layouts. Live Areas opens an overview without requiring an entity selection; search includes areas, and selecting an area prioritizes its members.
+The **View type** selector offers **Areas** (the default overview), **Relationships**, and **Automation flow**. Areas uses compact groups; Relationships offers left-to-right and top-to-bottom layouts. Live Areas opens an overview without requiring an entity selection; search includes areas, and selecting an area prioritizes its members.
 
 Areas appear as labeled containers around their devices and entities. Explicit entity area assignments override the device area. Sandbox membership comes from `contains` and `assigned to`, with `provides` used to inherit a device's area. Conflicting explicit sandbox assignments remain outside until resolved. Unassigned nodes and automations/scripts without an area stay outside; selecting a node or group shows its other references, including cross-area references. **Show all connections** displays all non-ownership references. Ownership and membership edges remain in the underlying graph and Inspector, while containment replaces their chart lines.
 
 The Areas layout places each device's visible entities inside a labeled device container, arranging device containers and other nodes in compact rows inside the area. Devices without an area use the same containers outside rooms. Entities with explicit assignments to a different room stay in that room; missing or ambiguous ownership does not create a device group. Entity visibility filters run before layout, so hidden entities leave no automatic empty slots. Selecting a device or area shows references for its nested entities.
 
 Drag an area or device by its heading to move the whole group, or reposition entities within their device. Area positions save separately for each mode, with a new storage key that automatically replaces the old flowchart arrangement. Switching views preserves the relationship graph's positions. Views are limited to 180 source nodes and show a notice when truncated; focus an area or entity to explore further. In Sandbox, use Relationships to draw or inspect ownership connections; the Inspector still lists all visible source relationships in either view.
+
+### Automation and script flows
+
+Selecting an automation or script in search or on the chart opens **Automation flow**. The automation appears at the top, followed by alternative triggers, condition gates, and numbered actions in configured YAML order. Scripts start directly with their sequence. Device and area context appears beside target references instead of driving the action layout. Target buttons open their object in the explorer; **Show all** returns to Areas.
+
+If/else and first-match `choose` branches are shown separately, parallel branches sit side by side, and repeats retain their before/after condition checks. Delays, waits, timeout behavior, condition actions, disabled steps, and stops remain explicit. Direct `script.name` calls can expand their sequence in place; recursive calls stop expansion and nested expansion is limited to four flow levels. `script.turn_on` is labeled as starting scripts without waiting. Multiple actions referring to the same entity remain separate steps.
+
+Flows describe configuration, never a live execution trace or guaranteed runtime path. Only uniquely mapped, accessible YAML configurations produce an ordered flow. Blueprints, ambiguous mappings, and missing configuration show **References only** with unordered trigger/condition/action groups. Sandbox relationships also lack an executable sequence, so they use this fallback. Templates and arbitrary service data, notification contents, variable values, and secrets are not returned. Dynamic and unsupported steps remain as labeled placeholders; their behavior is not inferred.
+
+Flow parsing is limited to 160 steps and 12 nested levels per configuration, 32 target references per step, and 180 context objects per requested view, with notices for omissions. Visibility filters hide target chips without removing configured steps or changing their order. Flow requires no additional Home Assistant commands, polling, or service execution. The implementation follows Home Assistant's [script building blocks](https://www.home-assistant.io/docs/scripts/) and [automation triggers](https://www.home-assistant.io/docs/automation/trigger/).
 
 ### App branding
 

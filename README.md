@@ -28,10 +28,10 @@ Open http://127.0.0.1:8099. Sandbox works without Home Assistant credentials. Fo
 From the repository root, build the exact Supervisor context with:
 
 ```powershell
-docker build --platform linux/amd64 --build-arg BUILD_ARCH=amd64 --build-arg BUILD_VERSION=0.3.3 -t entangle:local ./entangle
+docker build --platform linux/amd64 --build-arg BUILD_ARCH=amd64 --build-arg BUILD_VERSION=0.3.4 -t entangle:local ./entangle
 ```
 
-The container startup command directly runs `node server/index.js` as its only service. No `run.sh`, init system or legacy `build.yaml` is required. Both Docker stages use an explicit `node:24-alpine` base. The App manifest, package and image labels all use version 0.3.3.
+The container startup command directly runs `node server/index.js` as its only service. No `run.sh`, init system or legacy `build.yaml` is required. Both Docker stages use an explicit `node:24-alpine` base. The App manifest, package and image labels all use version 0.3.4.
 
 ## Repository structure
 
