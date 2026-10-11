@@ -21,3 +21,4 @@ main[hidden]{display:none}
 .react-flow__node-area{z-index:-1}.react-flow__node-area .react-flow__handle{z-index:1}
 
 .brand-logo{width:26px;height:36px;object-fit:contain;flex-shrink:0}
+.entity-type-filter>p{margin:8px 0;line-height:1.5}.entity-type-filter>button{margin-top:8px;font-size:calc(11px * var(--font-scale,1))}

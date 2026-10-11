@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.2
+
+- Organize the Areas view into device families, with entities beside or below their device in both layout directions.
+- Keep unassigned device families together and honor explicit entity area overrides and saved manual positions.
+- Add browser-saved entity visibility controls for whole domains and device classes, including battery sensors and firmware updates.
+- Apply visibility choices across both views, search, and relationship inspection without deleting source data.
+
 ## 0.3.1
 
 - Add Settings ? Appearance with browser-saved colors, font size, corner roundness, and spacing controls.

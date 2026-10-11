@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ReactFlow, Background, Controls, Handle, Position, BaseEdge, EdgeLabelRenderer, ReactFlowProvider, useReactFlow, applyNodeChanges } from '@xyflow/react';
-import { layout, readPreference, writePreference, positionKey, domainOf, filterNodes, DIAGNOSTIC_FILTER_KEY, loadHideDiagnostic, isDiagnostic, filterDiagnosticGraph, diagnosticSelection } from './graph-ui.js';
+import { layout, readPreference, writePreference, positionKey, domainOf, filterNodes, DIAGNOSTIC_FILTER_KEY, loadHideDiagnostic, isDiagnostic, filterDiagnosticGraph, diagnosticSelection, HIDDEN_TYPES_KEY, loadHiddenTypes, entityTypeOptions, isHiddenEntityType, filterEntityTypes } from './graph-ui.js';
 import { appearance, NodeIcon } from './appearance.jsx';
 import { selectSubgraph, selectAreaGraph } from '../server/graph.js';
 import { kinds, emptySandbox, starterSandbox, loadSandbox, saveSandbox, parseSandbox, serializeSandbox, updateNode, deleteNode, addRelationship, relationshipTypes } from './sandbox.js';
@@ -65,6 +65,20 @@ function NodeEditor({ node, onSave, onCancel, creating = false }) {
   </form>;
 }
 
+function EntityTypeFilters({ options, hidden, onChange }) {
+  const toggle = (id, checked) => onChange(checked ? [...hidden, id] : hidden.filter(t => t !== id));
+  return <details className="domain-filter entity-type-filter">
+    <summary>Hide entity types {hidden.length ? `(${hidden.length})` : ''}</summary>
+    <p className="muted">Checked types are hidden from the chart and search across all devices.</p>
+    <div>{options.map(type => <label key={type.id}>
+      <input type="checkbox" checked={hidden.includes(type.id)} onChange={e => toggle(type.id, e.target.checked)}/>{type.label}
+    </label>)}{hidden.filter(t => !options.some(option => option.id === t)).map(t => <label key={t}>
+      <input type="checkbox" checked onChange={() => toggle(t, false)}/>{t.replaceAll('_', ' ')} (unavailable)
+    </label>)}</div>
+    {hidden.length > 0 && <button onClick={() => onChange([])}>Show all entity types</button>}
+  </details>;
+}
+
 function App() {
  const [settingsOpen,setSettingsOpen] = useState(false);
  const [theme,setTheme] = useState(()=>sanitizeTheme(readPreference(storage(),THEME_KEY,{})));
@@ -84,6 +98,7 @@ function App() {
   const positionsKey = viewPositionKey(mode, view, direction);
   const [domains, setDomains] = useState(() => { const value = readPreference(storage(), 'entangle.filters.v1', []); return Array.isArray(value) ? value.filter(d => typeof d === 'string') : []; });
   const [hideDiagnostic, setHideDiagnostic] = useState(() => loadHideDiagnostic(storage()));
+  const [hiddenTypes, setHiddenTypes] = useState(() => loadHiddenTypes(storage()));
   const [layoutRevision, setLayoutRevision] = useState(0);
   const [query, setQuery] = useState(''), [focus, setFocus] = useState(''), [depth, setDepth] = useState(1);
   const [inspectedId, setInspectedId] = useState(''), [selectedEdge, setSelectedEdge] = useState(''), [creating, setCreating] = useState(false);
@@ -132,11 +147,21 @@ function App() {
   const searchable = editable ? sandbox.nodes : snapshot?.entities || [];
   const availableDomains = useMemo(() => [...new Set(searchable.map(domainOf))].sort(), [searchable]);
   const searchMatches = useMemo(() => filterNodes(searchable, query, domains), [searchable, query, domains]);
-  const matches = useMemo(() => hideDiagnostic ? searchMatches.filter(n => !isDiagnostic(n)) : searchMatches, [searchMatches, hideDiagnostic]);
-  const hiddenDiagnosticCount = searchMatches.length - matches.length;
-  const visibleGraph = useMemo(() => filterDiagnosticGraph(graph, hideDiagnostic), [graph, hideDiagnostic]);
-  const visibleConnections = useMemo(() => filterDiagnosticGraph(editable ? sandbox : rawGraph, hideDiagnostic).edges, [editable, sandbox, rawGraph, hideDiagnostic]);
-  const selection = useMemo(() => diagnosticSelection(rawGraph, hideDiagnostic, inspectedId, selectedEdge), [rawGraph, hideDiagnostic, inspectedId, selectedEdge]);
+  const diagnosticMatches = useMemo(() => hideDiagnostic ? searchMatches.filter(n => !isDiagnostic(n)) : searchMatches, [searchMatches, hideDiagnostic]);
+  const matches = useMemo(() => diagnosticMatches.filter(n => !isHiddenEntityType(n, hiddenTypes)), [diagnosticMatches, hiddenTypes]);
+  const typeOptions = useMemo(() => entityTypeOptions(searchable), [searchable]);
+  const hiddenTypeCount = diagnosticMatches.length - matches.length;
+  const hiddenDiagnosticCount = searchMatches.length - diagnosticMatches.length;
+  const visibleGraph = useMemo(() => filterEntityTypes(filterDiagnosticGraph(graph, hideDiagnostic), hiddenTypes), [graph, hideDiagnostic, hiddenTypes]);
+  const visibleConnections = useMemo(() => filterEntityTypes(filterDiagnosticGraph(editable ? sandbox : rawGraph, hideDiagnostic), hiddenTypes).edges, [editable, sandbox, rawGraph, hideDiagnostic, hiddenTypes]);
+  const selection = useMemo(() => {
+    const selected = diagnosticSelection(rawGraph, hideDiagnostic, inspectedId, selectedEdge);
+    const source = editable ? sandbox : rawGraph;
+    const hidden = new Set(source.nodes.filter(n => isHiddenEntityType(n, hiddenTypes)).map(n => n.id));
+    const edge = source.edges.find(e => e.id === selected.edgeId);
+    return { nodeId: hidden.has(selected.nodeId) ? '' : selected.nodeId, edgeId: edge && (hidden.has(edge.source) || hidden.has(edge.target)) ? '' : selected.edgeId };
+  }, [rawGraph, sandbox, editable, hideDiagnostic, hiddenTypes, inspectedId, selectedEdge]);
+  function changeHiddenTypes(next) { setHiddenTypes(next); setNotice(writePreference(storage(), HIDDEN_TYPES_KEY, next)); }
   useEffect(() => {
     if (selection.nodeId !== inspectedId) setInspectedId(selection.nodeId);
     if (selection.edgeId !== selectedEdge) setSelectedEdge(selection.edgeId);
@@ -222,8 +247,8 @@ function App() {
       {editable ? <button onClick={createNode}>+ Add Node</button> : <button onClick={() => refresh()} disabled={busy}>{busy ? 'Refreshing…' : '↻ Refresh'}</button>}
     </div></header>
     <main hidden={settingsOpen}>
-      <aside className="sidebar"><div className="sidebar-top"><h2>{editable ? 'Sandbox nodes' : 'Entities and areas'} <span>{searchable.length}</span></h2><input aria-label="Search nodes" placeholder="Search name or ID…" value={query} onChange={e => setQuery(e.target.value)}/><details className="domain-filter"><summary>Domains {domains.length ? `(${domains.length})` : '(all)'}</summary><div>{availableDomains.map(domain => <label key={domain}><input type="checkbox" checked={domains.includes(domain)} onChange={e => changeDomains(e.target.checked ? [...domains, domain] : domains.filter(d => d !== domain))}/><NodeIcon node={{ kind: 'entity', entityId: `${domain}.filter` }}/>{domain.replaceAll('_', ' ')}</label>)}{domains.filter(d => !availableDomains.includes(d)).map(d => <label key={d}><input type="checkbox" checked onChange={() => changeDomains(domains.filter(v => v !== d))}/>{d} (unavailable)</label>)}</div></details><label className="diagnostic-toggle"><input type="checkbox" checked={hideDiagnostic} onChange={e => changeDiagnostic(e.target.checked)}/>Hide diagnostic entities</label>{(domains.length > 0 || query) && <button className="clear-filters" onClick={() => { changeDomains([]); setQuery(''); }}>Clear Filters</button>}<small>{matches.length} results{hiddenDiagnosticCount > 0 && ` / ${hiddenDiagnosticCount} diagnostic hidden`}{matches.length > 150 ? ' · showing first 150' : ''}</small></div>
-        <div className="entity-list">{matches.slice(0, 150).map(n => <button className={`entity-row ${focus === n.id ? 'active' : ''}`} key={n.id} onClick={() => choose(n.id)}><span className="symbol"><NodeIcon node={n}/></span><div><strong>{n.label}</strong><small>{n.entityId || n.id}</small></div></button>)}{!busy && !matches.length && <p className="muted padding">{query || domains.length || hiddenDiagnosticCount ? 'No matching nodes.' : editable ? 'Your sandbox is empty. Add a node to begin.' : 'Connect to Home Assistant to load entities.'}</p>}</div>
+      <aside className="sidebar"><div className="sidebar-top"><h2>{editable ? 'Sandbox nodes' : 'Entities and areas'} <span>{searchable.length}</span></h2><input aria-label="Search nodes" placeholder="Search name or ID…" value={query} onChange={e => setQuery(e.target.value)}/><details className="domain-filter"><summary>Domains {domains.length ? `(${domains.length})` : '(all)'}</summary><div>{availableDomains.map(domain => <label key={domain}><input type="checkbox" checked={domains.includes(domain)} onChange={e => changeDomains(e.target.checked ? [...domains, domain] : domains.filter(d => d !== domain))}/><NodeIcon node={{ kind: 'entity', entityId: `${domain}.filter` }}/>{domain.replaceAll('_', ' ')}</label>)}{domains.filter(d => !availableDomains.includes(d)).map(d => <label key={d}><input type="checkbox" checked onChange={() => changeDomains(domains.filter(v => v !== d))}/>{d} (unavailable)</label>)}</div></details><label className="diagnostic-toggle"><input type="checkbox" checked={hideDiagnostic} onChange={e => changeDiagnostic(e.target.checked)}/>Hide diagnostic entities</label><EntityTypeFilters options={typeOptions} hidden={hiddenTypes} onChange={changeHiddenTypes}/>{(domains.length > 0 || query) && <button className="clear-filters" onClick={() => { changeDomains([]); setQuery(''); }}>Clear Filters</button>}<small>{matches.length} results{hiddenDiagnosticCount > 0 && ` / ${hiddenDiagnosticCount} diagnostic hidden`}{hiddenTypeCount > 0 && ` / ${hiddenTypeCount} hidden by type`}{matches.length > 150 ? ' · showing first 150' : ''}</small></div>
+        <div className="entity-list">{matches.slice(0, 150).map(n => <button className={`entity-row ${focus === n.id ? 'active' : ''}`} key={n.id} onClick={() => choose(n.id)}><span className="symbol"><NodeIcon node={n}/></span><div><strong>{n.label}</strong><small>{n.entityId || n.id}</small></div></button>)}{!busy && !matches.length && <p className="muted padding">{query || domains.length || hiddenDiagnosticCount || hiddenTypeCount ? 'No matching nodes.' : editable ? 'Your sandbox is empty. Add a node to begin.' : 'Connect to Home Assistant to load entities.'}</p>}</div>
         <footer>{editable ? 'Virtual data · saved in this browser' : 'Read only · refreshed on demand'}{!editable && snapshot?.refreshedAt && <small>Updated {new Date(snapshot.refreshedAt).toLocaleTimeString()}</small>}</footer>
       </aside>
       <section className="canvas">
@@ -249,7 +274,7 @@ function App() {
           {editable && !sandbox.nodes.length && <div className="empty sandbox-empty"><span>⋈</span><h1>Build your sandbox</h1><p>Add a node or restore the starter graph from Sandbox tools.</p><button onClick={createNode}>+ Add Node</button></div>}
         </> : <div className="empty"><span>⋈</span><h1>{busy ? 'Connecting to Home Assistant' : 'Start with an entity'}</h1><p>{busy ? 'Loading states and registries…' : 'Search and select an entity to explore its connections.'}</p></div>}{graphBusy && <div className="loading" role="status">Loading relationships…</div>}</div>
         <div className="coverage">{graph.truncated && <p>View limited to 180 nodes. Search for an area or entity to explore further.</p>}
-          {view === 'areas' && <p>Areas contain their assigned devices and entities. Drag an area by its heading to move its members together. Unassigned nodes remain outside. Area membership is shown by containment; other relationships remain visible.</p>}
+          {view === 'areas' && <p>Areas keep each device beside its entities, with separate rows for each device family. Drag an area by its heading to move its members together. Unassigned nodes remain outside. Area membership is shown by containment; other relationships remain visible.</p>}
           {editable ? <span>Sandbox · virtual data only. Drag from a right handle to a left handle to connect. Select a node or edge to edit. No automations execute.</span> : <details><summary>Coverage · graph is not exhaustive{snapshot ? ` · ${snapshot.analyzed} YAML configurations analyzed` : ''}</summary>{snapshot?.warnings.map((w, i) => <p key={i}>{w}</p>)}<p>Ownership and area assignments come from registries. Edges describe references, not guaranteed runtime execution. State is current as of the last refresh.</p></details>}
         </div>
       </section>

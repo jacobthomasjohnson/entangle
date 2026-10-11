@@ -1,8 +1,32 @@
 ﻿import test from 'node:test';
 import assert from 'node:assert/strict';
-import { layout, positionKey, readPreference, writePreference, filterNodes } from '../src/graph-ui.js';
+import { layout, positionKey, readPreference, writePreference, filterNodes, HIDDEN_TYPES_KEY, loadHiddenTypes, entityTypeOptions, filterEntityTypes } from '../src/graph-ui.js';
 import { buildGraph } from '../server/graph.js';
 const graph = { nodes: [{ id: 'area', kind: 'area', label: 'Office' }, { id: 'light.desk', entityId: 'light.desk', kind: 'entity', label: 'Desk' }], edges: [{ id: 'owns', source: 'light.desk', target: 'area', relationship: 'assigned area' }] };
+test('hidden entity types support whole domains and device classes across devices without deleting data',()=>{
+ const source={nodes:[{id:'device',kind:'device',label:'Device'},
+  {id:'sensor.battery1',kind:'entity',deviceClass:'battery'},
+  {id:'sensor.battery2',kind:'entity',deviceClass:'battery'},
+  {id:'sensor.temperature',kind:'entity',deviceClass:'temperature'},
+  {id:'update.firmware',kind:'entity'}, {id:'area',kind:'area'}],
+  edges:[{id:'battery',source:'device',target:'sensor.battery1'},{id:'temp',source:'device',target:'sensor.temperature'}]};
+ const original=structuredClone(source), visible=filterEntityTypes(source,['sensor:battery','update']);
+ assert.deepEqual(visible.nodes.map(n=>n.id),['device','sensor.temperature','area']);
+ assert.deepEqual(visible.edges.map(e=>e.id),['temp']);
+ assert.deepEqual(source,original);
+ assert.deepEqual(filterEntityTypes(source,[]),source);
+ assert.deepEqual(filterEntityTypes(source,['sensor']).nodes.map(n=>n.id),['device','update.firmware','area']);
+ assert.deepEqual(filterEntityTypes({nodes:source.nodes.map(n=>({id:n.id,data:n,position:{x:1,y:2}})),edges:source.edges},['sensor:battery']).nodes.map(n=>n.id),['device','sensor.temperature','update.firmware','area']);
+ assert.equal(entityTypeOptions(source.nodes).filter(t=>t.id==='sensor:battery').length,1);
+ assert.equal(entityTypeOptions(source.nodes).some(t=>t.id==='device'),false);
+ const storage={getItem:()=>JSON.stringify(['sensor:battery',3,'sensor:battery','update'])};
+ assert.deepEqual(loadHiddenTypes(storage),['sensor:battery','update']);
+ assert.deepEqual(loadHiddenTypes({getItem:()=>'{bad'}),[]);
+ assert.deepEqual(loadHiddenTypes({getItem:()=>'{"sensor":true}'}),[]);
+ const saved=new Map(), writable={getItem:k=>saved.get(k),setItem:(k,v)=>saved.set(k,v)};
+ writePreference(writable,HIDDEN_TYPES_KEY,['sensor:battery']);
+ assert.deepEqual(loadHiddenTypes(writable),['sensor:battery']);
+});
 test('layout is deterministic, hierarchical in both directions and preserves relationship semantics', () => {
   for (const direction of ['LR', 'TB']) {
     const result = layout(graph, direction);

@@ -73,3 +73,28 @@ export function diagnosticSelection(graph, hideDiagnostic, nodeId, edgeId) {
   const edge = graph.edges.find(e => e.id === edgeId);
   return { nodeId: hidden.has(nodeId) ? '' : nodeId, edgeId: edge && (hidden.has(edge.source) || hidden.has(edge.target)) ? '' : edgeId };
 }
+
+export const HIDDEN_TYPES_KEY = 'entangle.hiddenEntityTypes.v1';
+export function loadHiddenTypes(storage) {
+  const value = readPreference(storage, HIDDEN_TYPES_KEY, []);
+  return Array.isArray(value) ? [...new Set(value.filter(v => typeof v === 'string'))] : [];
+}
+export function entityTypeOptions(nodes) {
+  const options = new Map();
+  for (const raw of nodes) {
+    const n = raw.data || raw;
+    if (n.kind !== 'entity') continue;
+    const domain = domainOf(n), label = domain.replaceAll('_', ' ');
+    options.set(domain, { id: domain, label: `All ${label} entities` });
+    if (n.deviceClass) options.set(`${domain}:${n.deviceClass}`, { id: `${domain}:${n.deviceClass}`, label: `${n.deviceClass.replaceAll('_', ' ')} (${label})` });
+  }
+  return [...options.values()].sort((a, b) => a.id.localeCompare(b.id));
+}
+export function isHiddenEntityType(raw, hiddenTypes) {
+  const n = raw.data || raw;
+  return n.kind === 'entity' && (hiddenTypes.includes(domainOf(n)) || (n.deviceClass && hiddenTypes.includes(`${domainOf(n)}:${n.deviceClass}`)));
+}
+export function filterEntityTypes(graph, hiddenTypes) {
+  const nodes = graph.nodes.filter(n => !isHiddenEntityType(n, hiddenTypes)), ids = new Set(nodes.map(n => n.id));
+  return { ...graph, nodes, edges: graph.edges.filter(e => ids.has(e.source) && ids.has(e.target)) };
+}

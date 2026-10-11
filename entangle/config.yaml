@@ -1,5 +1,5 @@
 name: Entangle
-version: "0.3.1"
+version: "0.3.2"
 slug: entangle
 description: Read-only Home Assistant explorer with an isolated editable sandbox
 arch:

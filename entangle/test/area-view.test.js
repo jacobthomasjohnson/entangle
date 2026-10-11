@@ -1,12 +1,34 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { areaMembership, selectAreaGraph, buildGraph } from '../server/graph.js';
-import { areaLayout, viewPositionKey } from '../src/area-view.js';
+import { areaLayout, familyPositions, viewPositionKey } from '../src/area-view.js';
 import { starterSandbox } from '../src/sandbox.js';
 import { filterDiagnosticGraph } from '../src/graph-ui.js';
 import { createApp } from '../server/index.js';
 const configuration={automations:[],scripts:{},warnings:[]};
 const data={areas:[{area_id:'office',name:'Office'},{area_id:'hall',name:'Hall'}],devices:[{id:'desk',name:'Desk',area_id:'office'}],entities:[{entity_id:'light.desk',device_id:'desk'},{entity_id:'sensor.door',device_id:'desk',area_id:'hall'},{entity_id:'sensor.debug',device_id:'desk',entity_category:'diagnostic'}],states:[],warnings:[]};
+test('device families stay together despite interleaved entity names and automation links',()=>{
+ const nodes=[{id:'d1',kind:'device',label:'Desk'},{id:'d2',kind:'device',label:'Lamp'},
+  ...Array.from({length:7},(_,i)=>({id:`e${i}`,kind:'entity',label:`Entity ${i}`})),{id:'auto',kind:'automation',label:'Arrival'}];
+ const edges=nodes.filter(n=>n.kind==='entity').map((n,i)=>({id:n.id,source:i%2?'d2':'d1',target:n.id,relationship:'provides'}));
+ edges.push({id:'trigger',source:'e0',target:'auto',relationship:'triggers'});
+ for(const direction of ['LR','TB']) {
+  const positions=familyPositions(nodes,edges,direction);
+  assert.deepEqual(positions,familyPositions([...nodes].reverse(),[...edges].reverse(),direction));
+  const next=positions.get('d2');
+  for(const id of ['e0','e2','e4','e6']) {
+   const p=positions.get(id);
+   assert.ok(p.y+90<next.y);
+   assert.ok(direction==='LR'?p.x>positions.get('d1').x:p.y>positions.get('d1').y);
+  }
+  const rectangles=[...positions.values()];
+  for(let i=0;i<rectangles.length;i++) for(let j=i+1;j<rectangles.length;j++)
+   assert.ok(Math.abs(rectangles[i].x-rectangles[j].x)>=220 || Math.abs(rectangles[i].y-rectangles[j].y)>=90);
+ }
+ // HA ownership points from entity to device and produces the same family placement.
+ const reversed=edges.map(e=>e.relationship==='provides'?{...e,source:e.target,target:e.source,relationship:'owned by'}:e);
+ assert.deepEqual(familyPositions(nodes,edges,'LR'),familyPositions(nodes,reversed,'LR'));
+});
 test('HA area grouping honors explicit assignments over devices and includes empty rooms',()=>{
  const graph=buildGraph(data,configuration), membership=areaMembership(graph);
  assert.equal(membership.get('light.desk'),'area:office');

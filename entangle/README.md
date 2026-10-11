@@ -63,6 +63,10 @@ Selecting nodes highlights adjacent relationships and dims unrelated elements. R
 
 Sandbox entity editors offer Uncategorized, Diagnostic and Configuration categories. Optional `entity_category` survives JSON import/export and browser persistence; existing version 1 datasets remain compatible. Filtering never deletes Sandbox content.
 
+### Hide entity types
+
+Expand **Hide entity types** in the sidebar to hide entire entity domains (for example, updates or buttons), or a domain's device class (for example, battery sensors without hiding temperature sensors). Checked options hide matching entities across all devices in both views and modes, including search and incident relationships. Devices and areas remain visible. **Show all entity types** clears these choices; diagnostic hiding remains a separate preference. Choices persist in this browser. Filtering preserves coordinates and source data, and hidden selections clear.
+
 ### Appearance
 
 Open **Settings ? Appearance** to customize the palette (including node and relationship colors), font size, corner roundness, and spacing. Changes apply immediately to Live and Sandbox and persist in the current browser. Reset individual colors or restore the default appearance. These preferences are local to the browser, rather than shared through Home Assistant.
@@ -72,6 +76,8 @@ Open **Settings ? Appearance** to customize the palette (including node and rela
 The **View type** selector switches between **Areas** (the default) and **Relationships**. Both support left-to-right and top-to-bottom layouts. Live Areas opens an overview without requiring an entity selection; search includes areas, and selecting an area prioritizes its members.
 
 Areas appear as labeled containers around their devices and entities. Explicit entity area assignments override the device area. Sandbox membership comes from `contains` and `assigned to`, with `provides` used to inherit a device's area. Conflicting explicit sandbox assignments remain outside until resolved. Unassigned nodes and automations/scripts without an area stay outside; cross-area references and device ownership remain visible. Membership edges still exist in the underlying graph and Inspector.
+
+The automatic Areas layout places each device beside its own entities in left-to-right mode, or above them in top-to-bottom mode. Each device family occupies a separate band; entities without a visible, unambiguous owner follow the device families. Unassigned devices and entities use the same arrangement outside area containers. Explicit entity area overrides remain authoritative, even when the device belongs to another room. Saved manual positions take priority; use **Reset Layout** to apply the new arrangement to an existing saved view.
 
 Drag a container by its heading to move the room together, or reposition members within it. Area positions save separately for each mode and direction. Switching views preserves the relationship graph's positions. Views are limited to 180 nodes and show a notice when truncated; focus an area or entity to explore further. Diagnostic hiding still applies.
 
