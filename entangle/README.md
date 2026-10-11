@@ -74,3 +74,7 @@ The **View type** selector switches between **Areas** (the default) and **Relati
 Areas appear as labeled containers around their devices and entities. Explicit entity area assignments override the device area. Sandbox membership comes from `contains` and `assigned to`, with `provides` used to inherit a device's area. Conflicting explicit sandbox assignments remain outside until resolved. Unassigned nodes and automations/scripts without an area stay outside; cross-area references and device ownership remain visible. Membership edges still exist in the underlying graph and Inspector.
 
 Drag a container by its heading to move the room together, or reposition members within it. Area positions save separately for each mode and direction. Switching views preserves the relationship graph's positions. Views are limited to 180 nodes and show a notice when truncated; focus an area or entity to explore further. Diagnostic hiding still applies.
+
+### App branding
+
+The supplied Entangle SVG is used in the web UI and favicon, with PNG versions for the Home Assistant App Store and app details. The exact sidebar logo requires a custom frontend icon module; see [logo and sidebar setup](DOCS.md#entangle-logo-and-home-assistant-sidebar).

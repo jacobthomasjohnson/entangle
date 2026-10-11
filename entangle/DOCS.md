@@ -24,3 +24,33 @@ Registry relationships include entity/device ownership and direct/inherited area
 The backend logs startup mode and snapshot counts without credentials. It runs one Fastify process on container port 8099, accepts only the Supervisor Ingress TCP peer (`172.30.32.2`, including IPv4-mapped IPv6), ignores forwarded headers for access checks, and cancels active Home Assistant requests on shutdown. Ingress provides authentication and forwards its base path for relative assets and API requests. The app has no client routes or browser WebSocket requiring additional proxy configuration.
 
 For local development, use the instructions in the [repository README](../README.md); `HA_URL`, `HA_TOKEN` and optionally `HA_CONFIG_DIR` apply only outside Supervisor. The standalone container can run locally without enabling the App-only `ENTANGLE_INGRESS_ONLY` environment variable.
+
+## Entangle logo and Home Assistant sidebar
+
+The app includes `icon.png` (128?128) and `logo.png` (256?256) next to `config.yaml`, generated from `src/assets/entangle-logo.svg`. Supervisor uses these for the store and app details. The web UI uses the original SVG in its header and browser favicon. Reload the App Store after the repository containing these files has been pushed; rebuild/update the app for web UI changes.
+
+The HA sidebar is separate: `panel_icon` is an icon identifier, not a PNG/SVG filename. The default stays `mdi:graph-outline` so the sidebar works on installations without custom frontend resources. To use the Entangle design in the sidebar, the repository includes `ha/entangle-icons.js`, which registers **`entangle:logo`**. This is a monochrome version of the logo that follows HA's icon color.
+
+1. Copy `ha/entangle-icons.js` into Home Assistant's `/config/www/entangle-icons.js` (create `www` if necessary).
+2. Add the URL to the existing `frontend` configuration in HA's `configuration.yaml`. Merge it with any existing `extra_module_url` list; do not create a duplicate `frontend` section:
+
+   ```yaml
+   frontend:
+     extra_module_url:
+       - /local/entangle-icons.js?v=1
+   ```
+
+3. Check HA's configuration, restart Home Assistant, and reload the browser.
+4. If you use [Custom Sidebar](https://elchininet.github.io/custom-sidebar/), merge this entry into its `order` list to replace the existing Entangle item's icon:
+
+   ```yaml
+   order:
+     - item: Entangle
+       icon: entangle:logo
+   ```
+
+   Follow that plugin's installation/configuration instructions if it is not already installed. This keeps Entangle installed from the normal App Store repository. Alternatively, for a locally maintained app build, set `panel_icon: entangle:logo` in the app's `config.yaml` after installing the frontend module, then rebuild/reload that app's metadata. Do not set the custom identifier on installations that have not loaded the module.
+
+Store icons do not automatically replace sidebar icons. The module must load in HA's main frontend, rather than inside Entangle's Ingress frame; HA configuration is still mounted read-only by the app. No HA configuration has been changed automatically.
+
+References: [HA app presentation](https://developers.home-assistant.io/docs/apps/presentation/), [HA app configuration](https://developers.home-assistant.io/docs/apps/configuration/), and [frontend module loading](https://www.home-assistant.io/integrations/frontend/).

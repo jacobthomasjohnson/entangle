@@ -19,3 +19,5 @@ main[hidden]{display:none}
 .area-container.selected{outline:2px solid var(--color-a5a0f0,#a5a0f0);outline-offset:3px}
 .area-heading{height:60px;display:flex;align-items:center;gap:10px;padding:12px 24px;cursor:grab;border-bottom:1px solid var(--color-292e38,#292e38);color:var(--color-eceef2,#eceef2)}.area-heading strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}.area-heading small{white-space:nowrap}
 .react-flow__node-area{z-index:-1}.react-flow__node-area .react-flow__handle{z-index:1}
+
+.brand-logo{width:26px;height:36px;object-fit:contain;flex-shrink:0}

@@ -7,6 +7,7 @@ import { selectSubgraph, selectAreaGraph } from '../server/graph.js';
 import { kinds, emptySandbox, starterSandbox, loadSandbox, saveSandbox, parseSandbox, serializeSandbox, updateNode, deleteNode, addRelationship, relationshipTypes } from './sandbox.js';
 import '@xyflow/react/dist/style.css';
 import './style.css';
+import entangleLogo from './assets/entangle-logo.svg';
 import { AppearanceSettings } from './settings.jsx';
 import { areaLayout, VIEW_KEY, views, viewPositionKey } from './area-view.js';
 import { THEME_KEY, sanitizeTheme, themeStyle } from './theme.js';
@@ -215,7 +216,7 @@ function App() {
     return { ...e, selected: e.id === selection.edgeId, style: { ...e.style, opacity: connected.size && !highlighted ? .3 : 1, strokeWidth: highlighted ? 2.5 : 1.5 } };
   });
   return <div className="app" style={themeStyle(theme)}>
-    <header><div className="brand"><span>⋈</span> Entangle <small>ENTITY EXPLORER</small></div><div className="header-actions"><button onClick={()=>setSettingsOpen(true)}>Settings</button>
+    <header><div className="brand"><img className="brand-logo" src={entangleLogo} alt=""/> Entangle <small>ENTITY EXPLORER</small></div><div className="header-actions"><button onClick={()=>setSettingsOpen(true)}>Settings</button>
       <div className="mode-selector" role="group" aria-label="Mode">{['live', 'sandbox'].map(m => <button key={m} className={mode === m ? 'active' : ''} aria-pressed={mode === m} onClick={() => switchMode(m)}>{m === 'live' ? 'Live' : 'Sandbox'}</button>)}</div>
       <span className={`status ${editable ? 'sandbox-status' : snapshot?.connected ? 'online' : ''}`}>{editable ? 'Sandbox · virtual data' : busy ? 'Connecting…' : snapshot?.connected ? 'Connected · snapshot' : 'Disconnected'}</span>
       {editable ? <button onClick={createNode}>+ Add Node</button> : <button onClick={() => refresh()} disabled={busy}>{busy ? 'Refreshing…' : '↻ Refresh'}</button>}
