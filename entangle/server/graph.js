@@ -71,3 +71,65 @@ export function selectSubgraph(graph, focus, depth = 1, limit = 180) {
   }
   return { nodes: graph.nodes.filter(n => selected.has(n.id)), edges: graph.edges.filter(e => selected.has(e.source) && selected.has(e.target)), truncated };
 }
+
+// Resolve both HA registry relationships and the sandbox's forward relationships.
+// Explicit entity assignments take precedence over inherited device membership.
+export function areaMembership(graph) {
+  const nodes = new Map(graph.nodes.map(n => [n.id, n]));
+  const direct = new Map(), inherited = new Map(), devices = new Map();
+  function assign(map, child, area) {
+    if (nodes.get(area)?.kind !== 'area' || nodes.get(child)?.kind === 'area' || !nodes.has(child)) return;
+    if (!map.has(child)) map.set(child, new Set());
+    map.get(child).add(area);
+  }
+  for (const n of graph.nodes) if (n.kind !== 'area' && n.areaId) {
+    const area = graph.nodes.find(a => a.kind === 'area' && (a.areaId === n.areaId || a.id === `area:${n.areaId}`));
+    if (area) assign(direct, n.id, area.id);
+  }
+  for (const e of graph.edges) {
+    if (e.relationship === 'assigned area') assign(direct, e.source, e.target);
+    if (e.relationship === 'inherited area') assign(inherited, e.source, e.target);
+    if (['contains', 'assigned to'].includes(e.relationship)) assign(direct, e.target, e.source);
+    const child = e.relationship === 'owned by' ? e.source : e.relationship === 'provides' ? e.target : null;
+    const device = e.relationship === 'owned by' ? e.target : e.source;
+    if (child && nodes.get(device)?.kind === 'device') {
+      if (!devices.has(child)) devices.set(child, new Set());
+      devices.get(child).add(device);
+    }
+  }
+  const result = new Map();
+  // Conflicting explicit sandbox assignments stay outside instead of guessing.
+  for (const [id, areas] of direct) if (areas.size === 1) result.set(id, [...areas][0]);
+  for (const n of graph.nodes) {
+    if (direct.has(n.id)) continue;
+    const areas = new Set(inherited.get(n.id) || []);
+    for (const device of devices.get(n.id) || []) if (result.has(device)) areas.add(result.get(device));
+    if (areas.size === 1) result.set(n.id, [...areas][0]);
+  }
+  return result;
+}
+export function selectAreaGraph(graph, focus = '', depth = 1, limit = 180) {
+  const membership = areaMembership(graph), byId = new Map(graph.nodes.map(n => [n.id, n]));
+  let candidates, subgraphTruncated = false;
+  if (!focus) candidates = [...graph.nodes].sort((a,b) => `${a.kind !== 'area'}:${a.label}:${a.id}`.localeCompare(`${b.kind !== 'area'}:${b.label}:${b.id}`));
+  else if (byId.get(focus)?.kind === 'area') {
+    const members = new Set([focus, ...[...membership].filter(([,a]) => a === focus).map(([id]) => id)]);
+    candidates = graph.nodes.filter(n => members.has(n.id));
+    // Include references crossing the room boundary after its own members.
+    const external = new Set(graph.edges.flatMap(e => members.has(e.source) ? [e.target] : members.has(e.target) ? [e.source] : []));
+    candidates.push(...graph.nodes.filter(n => external.has(n.id) && !members.has(n.id)));
+    candidates.sort((a,b) => Number(!members.has(a.id))-Number(!members.has(b.id)) || a.id.localeCompare(b.id));
+    candidates = [byId.get(focus), ...candidates.filter(n => n.id !== focus)];
+  } else {
+    const subgraph = selectSubgraph(graph, focus, depth, limit);
+    subgraphTruncated = subgraph.truncated;
+    candidates = [byId.get(focus), ...subgraph.nodes.filter(n => n.id !== focus)].filter(Boolean);
+  }
+  const selected = new Map();
+  for (const node of candidates) {
+    const area = byId.get(membership.get(node.id));
+    const needed = [area,node].filter(n => n && !selected.has(n.id));
+    if (selected.size + needed.length <= limit) for (const n of needed) selected.set(n.id,n);
+  }
+  return { nodes:[...selected.values()], edges:graph.edges.filter(e => selected.has(e.source) && selected.has(e.target)), truncated:subgraphTruncated || candidates.some(n => !selected.has(n.id)), membership:Object.fromEntries([...membership].filter(([id,area]) => selected.has(id) && selected.has(area))) };
+}

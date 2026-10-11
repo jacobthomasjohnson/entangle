@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readHomeAssistant } from './ha.js';
 import { loadConfiguration } from './configuration.js';
-import { buildGraph, selectSubgraph } from './graph.js';
+import { buildGraph, selectSubgraph, selectAreaGraph } from './graph.js';
 
 export async function createApp({ read, config = () => loadConfiguration(process.env.HA_CONFIG_DIR || (process.env.SUPERVISOR_TOKEN ? '/homeassistant' : '')), ingressOnly = !!process.env.SUPERVISOR_TOKEN || process.env.ENTANGLE_INGRESS_ONLY === 'true', logger = true } = {}) {
   const app = Fastify({ logger });
@@ -30,14 +30,15 @@ export async function createApp({ read, config = () => loadConfiguration(process
     });
     return pending;
   }
-  const summary = () => ({ connected: !!graph && !error, error, refreshedAt, warnings: graph?.warnings || [], analyzed: graph?.analyzed || 0, entities: graph?.nodes.filter(n => n.entityId) || [] });
+  const summary = () => ({ connected: !!graph && !error, error, refreshedAt, warnings: graph?.warnings || [], analyzed: graph?.analyzed || 0, entities: graph?.nodes.filter(n => n.entityId || n.kind === 'area') || [] });
   app.get('/api/snapshot', async () => { if (!graph && (!error || Date.now() >= retryAfter)) await refresh(); return summary(); });
   app.post('/api/refresh', async () => { await refresh(); return summary(); });
   app.get('/api/graph', async (request, reply) => {
-    const { focus, depth = '1' } = request.query;
+    const { focus, depth = '1', view } = request.query;
     if (!graph) return reply.code(503).send({ error: error || 'Refresh the connection first.' });
+    if (view === 'areas' && !focus) return selectAreaGraph(graph);
     if (!graph.nodes.some(n => n.id === focus)) return reply.code(404).send({ error: 'Entity not found.' });
-    return selectSubgraph(graph, focus, depth === '2' ? 2 : 1);
+    return view === 'areas' ? selectAreaGraph(graph, focus, depth === '2' ? 2 : 1) : selectSubgraph(graph, focus, depth === '2' ? 2 : 1);
   });
   app.get('/api/health', async () => ({ status: 'ok' }));
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../dist');

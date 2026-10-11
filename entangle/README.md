@@ -66,3 +66,11 @@ Sandbox entity editors offer Uncategorized, Diagnostic and Configuration categor
 ### Appearance
 
 Open **Settings ? Appearance** to customize the palette (including node and relationship colors), font size, corner roundness, and spacing. Changes apply immediately to Live and Sandbox and persist in the current browser. Reset individual colors or restore the default appearance. These preferences are local to the browser, rather than shared through Home Assistant.
+
+### Area and relationship views
+
+The **View type** selector switches between **Areas** (the default) and **Relationships**. Both support left-to-right and top-to-bottom layouts. Live Areas opens an overview without requiring an entity selection; search includes areas, and selecting an area prioritizes its members.
+
+Areas appear as labeled containers around their devices and entities. Explicit entity area assignments override the device area. Sandbox membership comes from `contains` and `assigned to`, with `provides` used to inherit a device's area. Conflicting explicit sandbox assignments remain outside until resolved. Unassigned nodes and automations/scripts without an area stay outside; cross-area references and device ownership remain visible. Membership edges still exist in the underlying graph and Inspector.
+
+Drag a container by its heading to move the room together, or reposition members within it. Area positions save separately for each mode and direction. Switching views preserves the relationship graph's positions. Views are limited to 180 nodes and show a notice when truncated; focus an area or entity to explore further. Diagnostic hiding still applies.
