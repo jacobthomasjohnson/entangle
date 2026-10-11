@@ -7,6 +7,8 @@ import { selectSubgraph } from '../server/graph.js';
 import { kinds, emptySandbox, starterSandbox, loadSandbox, saveSandbox, parseSandbox, serializeSandbox, updateNode, deleteNode, addRelationship, relationshipTypes } from './sandbox.js';
 import '@xyflow/react/dist/style.css';
 import './style.css';
+import { AppearanceSettings } from './settings.jsx';
+import { THEME_KEY, sanitizeTheme, themeStyle } from './theme.js';
 
 async function api(endpoint, options) {
   const response = await fetch(new URL(`api/${endpoint}`, document.baseURI), options);
@@ -54,6 +56,15 @@ function NodeEditor({ node, onSave, onCancel, creating = false }) {
 }
 
 function App() {
+ const [settingsOpen,setSettingsOpen] = useState(false);
+ const [theme,setTheme] = useState(()=>sanitizeTheme(readPreference(storage(),THEME_KEY,{})));
+ const [themeNotice,setThemeNotice] = useState('');
+ function changeTheme(next) {
+  const clean=sanitizeTheme(next);setTheme(clean);
+  try { if (!storage()) throw new Error(); storage().setItem(THEME_KEY,JSON.stringify(clean));setThemeNotice(''); }
+  catch { setThemeNotice('Changes apply now, but browser storage is unavailable. They will not survive a refresh.'); }
+ }
+
   const initial = useRef(null); if (!initial.current) initial.current = loadSandbox(storage());
   const [sandbox, setSandbox] = useState(initial.current.data), [notice, setNotice] = useState(initial.current.warning);
   const [mode, setMode] = useState('sandbox'); const editable = mode === 'sandbox';
@@ -183,13 +194,13 @@ function App() {
     const highlighted = e.id === selection.edgeId || (selection.nodeId && (e.source === selection.nodeId || e.target === selection.nodeId));
     return { ...e, selected: e.id === selection.edgeId, style: { ...e.style, opacity: connected.size && !highlighted ? .3 : 1, strokeWidth: highlighted ? 2.5 : 1.5 } };
   });
-  return <div className="app">
-    <header><div className="brand"><span>⋈</span> Entangle <small>ENTITY EXPLORER</small></div><div className="header-actions">
+  return <div className="app" style={themeStyle(theme)}>
+    <header><div className="brand"><span>⋈</span> Entangle <small>ENTITY EXPLORER</small></div><div className="header-actions"><button onClick={()=>setSettingsOpen(true)}>Settings</button>
       <div className="mode-selector" role="group" aria-label="Mode">{['live', 'sandbox'].map(m => <button key={m} className={mode === m ? 'active' : ''} aria-pressed={mode === m} onClick={() => switchMode(m)}>{m === 'live' ? 'Live' : 'Sandbox'}</button>)}</div>
       <span className={`status ${editable ? 'sandbox-status' : snapshot?.connected ? 'online' : ''}`}>{editable ? 'Sandbox · virtual data' : busy ? 'Connecting…' : snapshot?.connected ? 'Connected · snapshot' : 'Disconnected'}</span>
       {editable ? <button onClick={createNode}>+ Add Node</button> : <button onClick={() => refresh()} disabled={busy}>{busy ? 'Refreshing…' : '↻ Refresh'}</button>}
     </div></header>
-    <main>
+    <main hidden={settingsOpen}>
       <aside className="sidebar"><div className="sidebar-top"><h2>{editable ? 'Sandbox nodes' : 'Entities'} <span>{searchable.length}</span></h2><input aria-label="Search nodes" placeholder="Search name or ID…" value={query} onChange={e => setQuery(e.target.value)}/><details className="domain-filter"><summary>Domains {domains.length ? `(${domains.length})` : '(all)'}</summary><div>{availableDomains.map(domain => <label key={domain}><input type="checkbox" checked={domains.includes(domain)} onChange={e => changeDomains(e.target.checked ? [...domains, domain] : domains.filter(d => d !== domain))}/><NodeIcon node={{ kind: 'entity', entityId: `${domain}.filter` }}/>{domain.replaceAll('_', ' ')}</label>)}{domains.filter(d => !availableDomains.includes(d)).map(d => <label key={d}><input type="checkbox" checked onChange={() => changeDomains(domains.filter(v => v !== d))}/>{d} (unavailable)</label>)}</div></details><label className="diagnostic-toggle"><input type="checkbox" checked={hideDiagnostic} onChange={e => changeDiagnostic(e.target.checked)}/>Hide diagnostic entities</label>{(domains.length > 0 || query) && <button className="clear-filters" onClick={() => { changeDomains([]); setQuery(''); }}>Clear Filters</button>}<small>{matches.length} results{hiddenDiagnosticCount > 0 && ` / ${hiddenDiagnosticCount} diagnostic hidden`}{matches.length > 150 ? ' · showing first 150' : ''}</small></div>
         <div className="entity-list">{matches.slice(0, 150).map(n => <button className={`entity-row ${focus === n.id ? 'active' : ''}`} key={n.id} onClick={() => choose(n.id)}><span className="symbol"><NodeIcon node={n}/></span><div><strong>{n.label}</strong><small>{n.entityId || n.id}</small></div></button>)}{!busy && !matches.length && <p className="muted padding">{query || domains.length || hiddenDiagnosticCount ? 'No matching nodes.' : editable ? 'Your sandbox is empty. Add a node to begin.' : 'Connect to Home Assistant to load entities.'}</p>}</div>
         <footer>{editable ? 'Virtual data · saved in this browser' : 'Read only · refreshed on demand'}{!editable && snapshot?.refreshedAt && <small>Updated {new Date(snapshot.refreshedAt).toLocaleTimeString()}</small>}</footer>
@@ -211,7 +222,7 @@ function App() {
             onNodesChange={changes => setGraph(g => ({ ...g, nodes: applyNodeChanges(changes.filter(c => c.type === 'position' || c.type === 'dimensions'), g.nodes) }))}
             onNodeDragStop={(_, node) => persistPosition(node)}
             onConnect={connect} nodesConnectable={editable} nodesDraggable={true} edgesReconnectable={false} deleteKeyCode={null} colorMode="dark" minZoom={0.1} maxZoom={1.8} fitView>
-            <Background color="#292e38" gap={24}/><Controls showInteractive={false}/>
+            <Background color="var(--color-292e38, #292e38)" gap={24}/><Controls showInteractive={false}/>
           </ReactFlow>
           {editable && !sandbox.nodes.length && <div className="empty sandbox-empty"><span>⋈</span><h1>Build your sandbox</h1><p>Add a node or restore the starter graph from Sandbox tools.</p><button onClick={createNode}>+ Add Node</button></div>}
         </> : <div className="empty"><span>⋈</span><h1>{busy ? 'Connecting to Home Assistant' : 'Start with an entity'}</h1><p>{busy ? 'Loading states and registries…' : 'Search and select an entity to explore its connections.'}</p></div>}{graphBusy && <div className="loading" role="status">Loading relationships…</div>}</div>
@@ -230,6 +241,7 @@ function App() {
         {inspectedEdge && <><h2 className="inspector-name">{inspectedEdge.relationship}</h2><dl><dt>Source</dt><dd>{inspectedEdge.source}</dd><dt>Target</dt><dd>{inspectedEdge.target}</dd></dl>{editable && <button className="danger" onClick={() => removeEdge(inspectedEdge.id)}>Delete relationship</button>}</>}
       </aside>}
     </main>
+    {settingsOpen && <AppearanceSettings theme={theme} onChange={changeTheme} notice={themeNotice} onClose={()=>setSettingsOpen(false)}/>}
     {editable && connection && <div className="dialog-backdrop"><form className="connection-dialog" role="dialog" aria-modal="true" aria-labelledby="relationship-title" onSubmit={e => { e.preventDefault(); try { commit(addRelationship(sandbox, connection.source, connection.target, connection.relationship)); setConnection(null); } catch (err) { setActionError(err.message); setConnection(null); } }}>
       <h2 id="relationship-title">Choose relationship</h2><p><code>{connection.source} → {connection.target}</code></p><label className="edit-field">Relationship type<select autoFocus value={connection.relationship} onChange={e => setConnection({ ...connection, relationship: e.target.value })}>{connection.options.map(o => <option key={o}>{o}</option>)}</select></label><div className="form-actions"><button type="submit">Add relationship</button><button type="button" onClick={() => setConnection(null)}>Cancel</button></div>
     </form></div>}

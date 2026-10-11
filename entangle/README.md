@@ -62,3 +62,7 @@ Selecting nodes highlights adjacent relationships and dims unrelated elements. R
 **Hide diagnostic entities** is enabled by default beside the sidebar domain filters and saved as a browser preference. Only entity registry `entity_category: diagnostic` marks Live entities as diagnostic; configuration and uncategorized entities remain visible. The preference filters search results and graph nodes together, hiding their incident edges without changing source data or adding replacement relationships. Counts reflect visible search results and show how many matching diagnostics are hidden. Toggle it off to restore nodes, relationships and their existing coordinates without layout or API requests. Hidden selections clear while the explored graph remains open.
 
 Sandbox entity editors offer Uncategorized, Diagnostic and Configuration categories. Optional `entity_category` survives JSON import/export and browser persistence; existing version 1 datasets remain compatible. Filtering never deletes Sandbox content.
+
+### Appearance
+
+Open **Settings ? Appearance** to customize the palette (including node and relationship colors), font size, corner roundness, and spacing. Changes apply immediately to Live and Sandbox and persist in the current browser. Reset individual colors or restore the default appearance. These preferences are local to the browser, rather than shared through Home Assistant.

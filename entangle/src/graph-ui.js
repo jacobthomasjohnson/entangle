@@ -10,10 +10,10 @@ export function writePreference(storage, key, value) {
 export const positionKey = mode => `entangle.positions.${mode}.v1`;
 export function validPosition(p) { return p && ['x', 'y'].every(k => Number.isFinite(p[k]) && Math.abs(p[k]) <= 1000000); }
 export function relationshipStyle(type = '') {
-  if (/trigger/.test(type)) return { stroke: '#87b99d', strokeDasharray: '5 3' };
-  if (/condition/.test(type)) return { stroke: '#b29ac9', strokeDasharray: '2 4' };
-  if (/action|control|calls/.test(type)) return { stroke: '#c5a17e' };
-  return { stroke: '#7f97a7' };
+  if (/trigger/.test(type)) return { stroke: 'var(--color-87b99d, #87b99d)', strokeDasharray: '5 3' };
+  if (/condition/.test(type)) return { stroke: 'var(--color-b29ac9, #b29ac9)', strokeDasharray: '2 4' };
+  if (/action|control|calls/.test(type)) return { stroke: 'var(--color-c5a17e, #c5a17e)' };
+  return { stroke: 'var(--color-7f97a7, #7f97a7)' };
 }
 export function layout(graph, direction = 'LR', retained = new Map(), saved = {}, focus = '') {
   const g = new dagre.graphlib.Graph({ multigraph: true });
