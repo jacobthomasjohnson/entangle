@@ -1,6 +1,22 @@
-# Entangle Home Assistant App repository
+# Entangle
 
-Entangle explores Home Assistant entity dependencies in read-only **Live Mode**, and offers an isolated, editable **Sandbox Mode**. This repository builds one production Node.js/Fastify container with its React/Vite frontend. Initial target: amd64 Home Assistant OS.
+[![test](https://github.com/jacobthomasjohnson/entangle/actions/workflows/test.yml/badge.svg)](https://github.com/jacobthomasjohnson/entangle/actions/workflows/test.yml)
+
+In a large Home Assistant setup it gets hard to answer simple questions: which automations touch this light, what breaks if I remove this device, which scripts run when this sensor changes. Entangle answers them by mapping how entities, devices, areas, automations and scripts connect, and drawing those relationships as an interactive graph and ordered automation flows.
+
+It connects to Home Assistant over the WebSocket API and never writes state, calls services or edits configuration. A separate **Sandbox Mode** lets you build and rearrange a virtual setup without touching a real system.
+
+**Stack:** Node.js and Fastify backend, React and Vite frontend, React Flow with Dagre for graph layout, Node's built-in test runner (47 tests), packaged as a Docker-based Home Assistant App. Initial target: amd64 Home Assistant OS.
+
+<!-- Screenshot: add docs/screenshot.png showing the graph view, then uncomment the line below. -->
+<!-- ![Entangle graph view](docs/screenshot.png) -->
+
+## How it works
+
+- **Live Mode** authenticates to `ws://supervisor/core/websocket` with the Supervisor token and requests only read commands (`get_states` and the entity, device and area registries). Configuration YAML is parsed from a read-only mount to find trigger, condition, action and script references.
+- **Graph** normalizes those reads into nodes and edges, then lays them out by device family and area, with filters for entity visibility and diagnostics.
+- **Sandbox Mode** reuses the same interface on virtual data stored in the browser, with validated JSON import and export.
+- **Security**: tokens stay server-side, HTTP access is limited to the Supervisor Ingress peer, and no host port is exposed.
 
 ## Install in Home Assistant
 
@@ -37,6 +53,7 @@ The container startup command directly runs `node server/index.js` as its only s
 
 ```text
 .
+├── .github/workflows/test.yml
 ├── .gitignore
 ├── README.md
 ├── repository.yaml
@@ -52,19 +69,15 @@ The container startup command directly runs `node server/index.js` as its only s
     ├── package.json
     ├── package-lock.json
     ├── vite.config.js
-    ├── server/
+    ├── ha/                  # optional sidebar icon module
+    ├── server/              # Fastify app, HA WebSocket client, YAML and graph analysis
+    │   ├── automation-flow.js
     │   ├── configuration.js
     │   ├── graph.js
     │   ├── ha.js
     │   └── index.js
-    ├── src/
-    │   ├── main.jsx
-    │   ├── sandbox.js
-    │   └── style.css
-    └── test/
-        ├── app.test.js
-        ├── deployment.test.js
-        └── sandbox.test.js
+    ├── src/                 # React UI: graph, area view, automation flows, sandbox, settings
+    └── test/                # node --test suites (47 tests)
 ```
 
 Generated `entangle/node_modules/`, `entangle/dist/` and private `.env` files are excluded from Git; the Docker build installs dependencies and builds assets itself.
