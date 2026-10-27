@@ -8,8 +8,7 @@ It connects to Home Assistant over the WebSocket API and never writes state, cal
 
 **Stack:** Node.js and Fastify backend, React and Vite frontend, React Flow with Dagre for graph layout, Node's built-in test runner (47 tests), packaged as a Docker-based Home Assistant App. Initial target: amd64 Home Assistant OS.
 
-<!-- Screenshot: add docs/screenshot.png showing the graph view, then uncomment the line below. -->
-<!-- ![Entangle graph view](docs/screenshot.png) -->
+![Entangle graph view: a bedroom area with its devices, entities, scenes and automations](docs/graph-view.png)
 
 ## How it works
 
@@ -18,6 +17,8 @@ It connects to Home Assistant over the WebSocket API and never writes state, cal
 - **Sandbox Mode** reuses the same interface on virtual data stored in the browser, with validated JSON import and export.
 - **Security**: tokens stay server-side, HTTP access is limited to the Supervisor Ingress peer, and no host port is exposed.
 
+![Automation flow view: a script's configured sequence with if/else branches, script calls and referenced entities](docs/automation-flow.png)
+
 ## Install in Home Assistant
 
 1. Use the public repository **https://github.com/jacobthomasjohnson/entangle**. The default branch contains `repository.yaml` at the root and the complete application inside `entangle/`, so Supervisor can clone and build it without Git credentials.
@@ -25,6 +26,9 @@ It connects to Home Assistant over the WebSocket API and never writes state, cal
 3. Add `https://github.com/jacobthomasjohnson/entangle` and close the dialog. Reload the store if necessary.
 4. Find **Entangle** under **Entangle Home Assistant Apps**, then select **Install**. Supervisor builds the Docker image from this repository; no published container image is needed.
 5. Select **Start** and enable **Show in sidebar**. Start on boot is enabled by default. Open **Web UI** or the **Entangle** sidebar entry as an administrator.
+
+   <img src="docs/ha-sidebar.png" alt="Entangle in the Home Assistant sidebar" width="300">
+
 6. Select **Live** in Entangle's header. The backend connects to the hosting Home Assistant using the Supervisor-provided token. No URL, long-lived token or other App settings are required.
 
 The App enables Home Assistant API access and a read-only configuration mount. It has no host port mapping; HTTP access is restricted to the Supervisor Ingress peer. Configuration parsing never writes files or calls services. See [App documentation](entangle/DOCS.md) for coverage and troubleshooting.
@@ -54,6 +58,7 @@ The container startup command directly runs `node server/index.js` as its only s
 ```text
 .
 ├── .github/workflows/test.yml
+├── docs/                    # README screenshots
 ├── .gitignore
 ├── README.md
 ├── repository.yaml
